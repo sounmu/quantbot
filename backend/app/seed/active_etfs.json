@@ -1,0 +1,140 @@
+[
+  {
+    "ticker": "ARKK",
+    "name": "ARK Innovation ETF",
+    "issuer": "ARK",
+    "theme": "Innovation",
+    "expense_ratio": 0.75,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "ARKG",
+    "name": "ARK Genomic Revolution ETF",
+    "issuer": "ARK",
+    "theme": "Genomics",
+    "expense_ratio": 0.75,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "ARKW",
+    "name": "ARK Next Generation Internet ETF",
+    "issuer": "ARK",
+    "theme": "Internet",
+    "expense_ratio": 0.88,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "ARKF",
+    "name": "ARK Fintech Innovation ETF",
+    "issuer": "ARK",
+    "theme": "Fintech",
+    "expense_ratio": 0.75,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "ARKX",
+    "name": "ARK Space Exploration & Innovation ETF",
+    "issuer": "ARK",
+    "theme": "Space",
+    "expense_ratio": 0.75,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JEPI",
+    "name": "JPMorgan Equity Premium Income ETF",
+    "issuer": "JPMorgan",
+    "theme": "Income",
+    "expense_ratio": 0.35
+  },
+  {
+    "ticker": "JEPQ",
+    "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+    "issuer": "JPMorgan",
+    "theme": "Income",
+    "expense_ratio": 0.35
+  },
+  {
+    "ticker": "CGGR",
+    "name": "Capital Group Growth ETF",
+    "issuer": "Capital Group",
+    "theme": "Growth",
+    "expense_ratio": 0.39
+  },
+  {
+    "ticker": "CGDV",
+    "name": "Capital Group Dividend Value ETF",
+    "issuer": "Capital Group",
+    "theme": "Dividend",
+    "expense_ratio": 0.33
+  },
+  {
+    "ticker": "DFAC",
+    "name": "Dimensional U.S. Core Equity 2 ETF",
+    "issuer": "Dimensional",
+    "theme": "Core Equity",
+    "expense_ratio": 0.17
+  },
+  {
+    "ticker": "AVUV",
+    "name": "Avantis U.S. Small Cap Value ETF",
+    "issuer": "Avantis",
+    "theme": "Small Value",
+    "expense_ratio": 0.25
+  },
+  {
+    "ticker": "AVDV",
+    "name": "Avantis International Small Cap Value ETF",
+    "issuer": "Avantis",
+    "theme": "International Value",
+    "expense_ratio": 0.36
+  },
+  {
+    "ticker": "PFFA",
+    "name": "Virtus InfraCap U.S. Preferred Stock ETF",
+    "issuer": "Virtus",
+    "theme": "Preferred Income",
+    "expense_ratio": 1.51
+  },
+  {
+    "ticker": "DYNF",
+    "name": "BlackRock U.S. Equity Factor Rotation ETF",
+    "issuer": "BlackRock",
+    "theme": "Factor Rotation",
+    "expense_ratio": 0.30
+  },
+  {
+    "ticker": "FBCG",
+    "name": "Fidelity Blue Chip Growth ETF",
+    "issuer": "Fidelity",
+    "theme": "Growth",
+    "expense_ratio": 0.59
+  },
+  {
+    "ticker": "TCAF",
+    "name": "T. Rowe Price Capital Appreciation Equity ETF",
+    "issuer": "T. Rowe Price",
+    "theme": "Capital Appreciation",
+    "expense_ratio": 0.31
+  },
+  {
+    "ticker": "TOTL",
+    "name": "SPDR DoubleLine Total Return Tactical ETF",
+    "issuer": "State Street",
+    "theme": "Fixed Income",
+    "expense_ratio": 0.55
+  },
+  {
+    "ticker": "MINT",
+    "name": "PIMCO Enhanced Short Maturity Active ETF",
+    "issuer": "PIMCO",
+    "theme": "Short Duration",
+    "expense_ratio": 0.35
+  },
+  {
+    "ticker": "BOND",
+    "name": "PIMCO Active Bond ETF",
+    "issuer": "PIMCO",
+    "theme": "Fixed Income",
+    "expense_ratio": 0.56
+  }
+]
