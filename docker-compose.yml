@@ -2,12 +2,10 @@ services:
   api:
     build:
       context: ./backend
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: sqlite+aiosqlite:////app/data/quantbot.db
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
-      HOLDINGS_HTTP_TIMEOUT: 30
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:////app/data/quantbot.db}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      HOLDINGS_HTTP_TIMEOUT: ${HOLDINGS_HTTP_TIMEOUT:-30}
     ports:
       - "8000:8000"
     volumes:
@@ -17,8 +15,9 @@ services:
   web:
     build:
       context: ./frontend
+    profiles: ["web"]
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     ports:
       - "3000:3000"
     depends_on:
