@@ -58,14 +58,16 @@
     "name": "Capital Group Growth ETF",
     "issuer": "Capital Group",
     "theme": "Growth",
-    "expense_ratio": 0.39
+    "expense_ratio": 0.39,
+    "discloses_daily": true
   },
   {
     "ticker": "CGDV",
     "name": "Capital Group Dividend Value ETF",
     "issuer": "Capital Group",
     "theme": "Dividend",
-    "expense_ratio": 0.33
+    "expense_ratio": 0.33,
+    "discloses_daily": true
   },
   {
     "ticker": "DFAC",
@@ -79,28 +81,32 @@
     "name": "Avantis U.S. Small Cap Value ETF",
     "issuer": "Avantis",
     "theme": "Small Value",
-    "expense_ratio": 0.25
+    "expense_ratio": 0.25,
+    "discloses_daily": true
   },
   {
     "ticker": "AVDV",
     "name": "Avantis International Small Cap Value ETF",
     "issuer": "Avantis",
     "theme": "International Value",
-    "expense_ratio": 0.36
+    "expense_ratio": 0.36,
+    "discloses_daily": true
   },
   {
     "ticker": "PFFA",
     "name": "Virtus InfraCap U.S. Preferred Stock ETF",
     "issuer": "Virtus",
     "theme": "Preferred Income",
-    "expense_ratio": 1.51
+    "expense_ratio": 1.51,
+    "discloses_daily": true
   },
   {
     "ticker": "DYNF",
     "name": "BlackRock U.S. Equity Factor Rotation ETF",
     "issuer": "BlackRock",
     "theme": "Factor Rotation",
-    "expense_ratio": 0.30
+    "expense_ratio": 0.30,
+    "discloses_daily": true
   },
   {
     "ticker": "FBCG",
@@ -114,14 +120,16 @@
     "name": "T. Rowe Price Capital Appreciation Equity ETF",
     "issuer": "T. Rowe Price",
     "theme": "Capital Appreciation",
-    "expense_ratio": 0.31
+    "expense_ratio": 0.31,
+    "discloses_daily": true
   },
   {
     "ticker": "TOTL",
     "name": "SPDR DoubleLine Total Return Tactical ETF",
     "issuer": "State Street",
     "theme": "Fixed Income",
-    "expense_ratio": 0.55
+    "expense_ratio": 0.55,
+    "discloses_daily": true
   },
   {
     "ticker": "MINT",

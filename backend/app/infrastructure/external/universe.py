@@ -25,7 +25,7 @@ async def load_seed_universe(
                 theme=row.get("theme"),
                 expense_ratio=row.get("expense_ratio"),
                 is_active_etf=True,
-                discloses_daily=row.get("discloses_daily", row.get("issuer") == "ARK"),
+                discloses_daily=row.get("discloses_daily", False),
                 currency=row.get("currency", "USD"),
                 description=row.get("description"),
             )
