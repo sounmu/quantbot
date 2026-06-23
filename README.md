@@ -1,6 +1,6 @@
 # Quantbot
 
-미국 상장 투명 액티브 ETF의 발행사 공식 보유종목 CSV를 매일 수집하고, 스냅샷 간 보유 주식수 변화를 계산해 “오늘 무엇을 샀고 팔았는지”를 보여주는 풀스택 웹 애플리케이션입니다.
+미국 상장 투명 액티브 ETF의 발행사 공식 보유종목 CSV/XLSX/JSON을 매일 수집하고, 스냅샷 간 보유 주식수 변화를 계산해 “오늘 무엇을 샀고 팔았는지”를 보여주는 풀스택 웹 애플리케이션입니다.
 
 핵심 판정 기준은 `shares` 변화입니다. 비중(`weight`)은 가격 변동만으로도 흔들릴 수 있어, 실제 매매 추정은 주식수 변화로 분류하고 비중 변화는 보조 컨텍스트로 함께 표시합니다.
 
@@ -10,7 +10,12 @@
 - SQLAlchemy async 기반 SQLite/PostgreSQL 교체 가능 DB 어댑터
 - ETF, 가격, holdings, holdings change, 메트릭, 수집 로그 ORM 모델과 Alembic 마이그레이션
 - ARK 공식 일별 CSV 어댑터: ARKK, ARKG, ARKW, ARKF, ARKX
+- BlackRock/iShares product-data JSON 어댑터: DYNF
+- State Street/SPDR 일별 XLSX 어댑터: TOTL
+- Capital Group 공식 일별 XLSX 어댑터: CGGR, CGDV
+- T. Rowe Price 상품 페이지 embedded JSON 어댑터: TCAF
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
+- APScheduler 기반 일일 자동 수집과 admin 수동 수집 API
 - ETF별 holdings 날짜, 스냅샷, 변동, 종목 이력, 전체 최근 매매 피드 API
 - Next.js App Router 프론트: ETF 목록, 상세 holdings diff, 종목 이력 차트, 전체 최근 매매 피드, 가격 컨텍스트, 비교 화면
 
@@ -50,6 +55,8 @@ uv run python -m app.application.pipeline.collect
 uv run uvicorn app.main:app --reload
 ```
 
+`SEED_UNIVERSE_ON_STARTUP=true`가 기본값이라 API 서버를 띄우면 ETF 기본 목록은 자동으로 upsert됩니다. holdings 스냅샷과 변동 데이터까지 채우려면 위의 `collect` 명령이나 admin 수동 수집 API를 실행합니다.
+
 확인:
 
 ```bash
@@ -65,6 +72,22 @@ uv run python -m app.application.pipeline.collect --with-prices --lookback-days 
 ```
 
 첫 수집에는 이전 스냅샷이 없으므로 대부분 `NEW`로 표시됩니다. 두 번째 영업일 스냅샷부터 `INCREASE`, `DECREASE`, `EXIT` 변동이 의미 있게 쌓입니다.
+
+스케줄러를 로컬에서 켜려면 `.env`에 다음을 설정합니다.
+
+```bash
+SCHEDULER_ENABLED=true
+COLLECT_CRON_HOUR=22
+COLLECT_CRON_MINUTE=0
+```
+
+수동 수집과 수집 로그 확인:
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/collect" -H "x-admin-token: change-me"
+curl -X POST "http://localhost:8000/api/admin/collect?with_prices=true&lookback_days=365" -H "x-admin-token: change-me"
+curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: change-me"
+```
 
 ### 3. 프론트
 
@@ -108,13 +131,21 @@ docker compose --profile postgres up --build
 
 ## 데이터 소스
 
-MVP는 ARK 공식 CSV를 사용합니다.
+현재 기본 registry에 등록된 공식 holdings 소스입니다.
 
 - ARKK: `https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv`
 - ARKG: `https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_GENOMIC_REVOLUTION_ETF_ARKG_HOLDINGS.csv`
 - ARKW: `https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_NEXT_GENERATION_INTERNET_ETF_ARKW_HOLDINGS.csv`
 - ARKF: `https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_FINTECH_INNOVATION_ETF_ARKF_HOLDINGS.csv`
 - ARKX: `https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_SPACE_EXPLORATION_&_INNOVATION_ETF_ARKX_HOLDINGS.csv`
+- DYNF: BlackRock product-data `component=holdings` JSON endpoint
+- TOTL: `https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-totl.xlsx`
+- CGGR: `https://www.capitalgroup.com/api/investments/investment-service/v1/etfs/CGGR/download/daily-holdings?audience=advisor`
+- CGDV: `https://www.capitalgroup.com/api/investments/investment-service/v1/etfs/CGDV/download/daily-holdings?audience=advisor`
+- TCAF: T. Rowe Price Capital Appreciation Equity ETF page embedded `full.holdings` JSON
+- AVUV: Avantis U.S. Small Cap Value ETF page embedded `etfHoldings` payload
+- AVDV: Avantis International Small Cap Value ETF page embedded `etfHoldings` payload
+- PFFA: `https://www.virtus.com/assets/files/1xx/positions_pffa.xls`
 
 다른 발행사는 `backend/app/infrastructure/external/holdings/`에 provider를 추가하고 registry에 등록하면 됩니다. 준투명 ETF처럼 일별 holdings를 공개하지 않는 상품은 `discloses_daily=false`로 두면 diff 수집에서 제외됩니다.
 
@@ -122,5 +153,7 @@ MVP는 ARK 공식 CSV를 사용합니다.
 
 - 프론트는 Vercel에서 `frontend/`를 프로젝트 루트로 지정합니다.
 - Vercel 환경변수 `NEXT_PUBLIC_API_BASE_URL=https://api.<domain>`을 설정합니다.
-- 백엔드는 Oracle Cloud Always Free ARM VM에서 Docker로 실행할 수 있게 구성했습니다.
-- 운영 백엔드는 Caddy 같은 리버스 프록시로 HTTPS를 붙이고, `CORS_ORIGINS`에 Vercel 도메인을 추가합니다.
+- 백엔드는 Oracle Cloud Always Free ARM VM에서 Docker Compose로 실행할 수 있게 구성했습니다.
+- `.env.production.example`을 `.env`로 복사하고 `API_DOMAIN`, `ADMIN_TOKEN`, `CORS_ORIGINS`를 운영값으로 바꿉니다.
+- VM 보안목록과 OS 방화벽에서 80/443을 열고 `docker compose -f docker-compose.prod.yml up -d --build`를 실행합니다.
+- `docker-compose.prod.yml`은 Caddy를 함께 띄워 `API_DOMAIN`에 자동 HTTPS를 붙이고 API 컨테이너로 프록시합니다.

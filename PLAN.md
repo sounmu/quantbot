@@ -16,8 +16,8 @@
 ### 핵심 결정 사항 (확정됨)
 - **추적 기준 = 보유 주식수(shares) + 비중(%) 둘 다.**
   비중%는 가격 변동만으로도 변하므로, **실제 매니저 매매는 shares Δ로 판정**하고 비중%는 배분 변화 보조지표로 함께 표시한다.
-- **데이터 소스 = 발행사 공식 일별 holdings CSV.** httpx로 직접 다운로드·파싱. ARK 어댑터를 먼저, 이후 발행사별 어댑터를 점진 추가.
-- **유니버스 = 투명 액티브 ETF 전반.** 발행사별 CSV 어댑터를 registry로 확장.
+- **데이터 소스 = 발행사 공식 일별 holdings CSV/XLSX/JSON.** httpx로 직접 다운로드·파싱. ARK 어댑터를 먼저, 이후 발행사별 어댑터를 점진 추가.
+- **유니버스 = 투명 액티브 ETF 전반.** 발행사별 멀티포맷 어댑터를 registry로 확장.
 - **가격/수익률은 보조 컨텍스트**(yfinance). 핵심은 holdings 변동이다.
 - **아키텍처**: **DDD + 헥사고날(포트 & 어댑터)** — 도메인/애플리케이션은 추상 **포트**에만 의존, DB·외부 소스는 교체 가능한 **어댑터**로 격리. → SQLite↔PostgreSQL 전환을 "어댑터 + DATABASE_URL 교체"만으로 처리.
 - **배포**: 프론트 = **Vercel**, 백엔드 = **Oracle Cloud Always Free** (ARM VM, Docker)
@@ -37,7 +37,7 @@
 | 마이그레이션 | Alembic | 1.13+ |
 | 스케줄러 | APScheduler | 3.10+ |
 | HTTP 클라이언트 | httpx | 0.27+ |
-| holdings 수집 | 발행사 공식 CSV (httpx 다운로드 + csv 파싱) | - |
+| holdings 수집 | 발행사 공식 CSV/XLSX/JSON (httpx 다운로드 + 포맷별 파싱) | - |
 | 가격 수집(보조) | yfinance | 0.2.40+ |
 | 검증 | Pydantic | 2.x |
 | DB | **SQLite(MVP) → PostgreSQL 이관 가능 구조** | - |
@@ -51,7 +51,7 @@
 
 ### 기본 설계 원칙
 - DB는 SQLite로 시작하되 **SQLAlchemy async + DATABASE_URL**로 추상화해 Postgres 전환 시 코드 변경 최소화.
-- 외부 데이터(발행사 CSV/yfinance)는 모두 `infrastructure/external/`에 어댑터로 격리. backoff/에러 로깅 필수.
+- 외부 데이터(발행사 holdings/yfinance)는 모두 `infrastructure/external/`에 어댑터로 격리. backoff/에러 로깅 필수.
 - **holdings는 매일 스냅샷으로 누적**한다(`as_of_date`가 스냅샷 키). 변동은 스냅샷 diff로 파생한다.
 - 프론트는 백엔드 REST만 소비. 화면 UI는 한국어, 데이터는 USD 기준.
 
@@ -94,7 +94,7 @@ quantbot/
 │     │  │  ├─ yfinance_provider.py  # 가격(보조)
 │     │  │  ├─ universe.py           # 유니버스 시드 로딩
 │     │  │  └─ holdings/             # 발행사별 holdings 어댑터
-│     │  │     ├─ base_csv.py        # CSV 다운로드/정규화 공통
+│     │  │     ├─ base_csv.py        # CSV/XLSX/JSON 다운로드/정규화 공통
 │     │  │     ├─ ark_provider.py    # ARK 공식 일별 CSV 파서
 │     │  │     └─ registry.py        # issuer/ticker → HoldingsProvider 매핑
 │     │  └─ scheduler/jobs.py
@@ -448,10 +448,10 @@ def get_holding_repo(session = Depends(get_session)) -> SqlAlchemyHoldingReposit
 **목표**: 유니버스 확대 + 정기 자동 수집 + Vercel/Oracle 배포.
 
 **작업 항목**
-1. `infrastructure/external/holdings/`에 발행사별 어댑터 점진 추가(공식 CSV 보유 발행사 우선), registry 등록. 준투명 ETF는 `discloses_daily=False`로 분류해 diff 제외.
+1. `infrastructure/external/holdings/`에 발행사별 어댑터 점진 추가(CSV/XLS/XLSX/JSON/HTML embedded data 멀티포맷), registry 등록. 준투명 ETF는 `discloses_daily=False`로 분류해 diff 제외. 1차 레퍼런스: ARK CSV, BlackRock/iShares DYNF product-data JSON(legacy CSV+preamble parser 포함), State Street/SPDR TOTL XLSX, Capital Group CGGR/CGDV 공식 XLSX, T. Rowe Price TCAF embedded JSON, Avantis AVUV/AVDV embedded `etfHoldings`, Virtus PFFA legacy XLS.
 2. `infrastructure/scheduler/jobs.py`: APScheduler로 매일 1회(UTC, 미국장 마감 후) collect 등록, `main.py` lifespan에서 start/shutdown.
 3. `interfaces/api/admin.py`: `POST /api/admin/collect`(수동 트리거), `GET /api/admin/runs`(수집 로그) — `ADMIN_TOKEN` 보호(`secrets.compare_digest`).
-4. 컨트랙트 테스트(SQLite)로 HoldingRepository 스냅샷/이전/이력 쿼리 검증. 백엔드 배포 = **Oracle Cloud Always Free**(ARM `linux/arm64` 빌드, VCN 보안목록 + OS 방화벽 둘 다 개방, Caddy 자동 HTTPS), 프론트 = **Vercel**(`NEXT_PUBLIC_API_BASE_URL`), 백엔드 CORS에 Vercel 도메인 등록.
+4. 컨트랙트 테스트(SQLite)로 HoldingRepository 스냅샷/이전/이력 쿼리 검증. 백엔드 배포 = **Oracle Cloud Always Free**(ARM `linux/arm64` 빌드, VCN 보안목록 + OS 방화벽 둘 다 개방, Caddy 자동 HTTPS), 프론트 = **Vercel**(`NEXT_PUBLIC_API_BASE_URL`), 백엔드 CORS에 Vercel 도메인 등록. 운영 compose는 `API_DOMAIN` 기반 Caddy reverse proxy를 포함한다.
 5. `README.md`에 수집/배포/환경변수 문서화.
 
 **완료 기준**
@@ -482,12 +482,14 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000     # 운영: https://api.<도메
 
 | 리스크 | 대응 |
 |---|---|
-| 발행사별 CSV 포맷 드리프트/커버리지(광범위 유니버스 = 다수 파서) | registry + graceful skip, 어댑터별 파싱 테스트, per-ETF 에러 로깅으로 격리 |
+| 발행사별 CSV/XLSX/JSON 포맷 드리프트/커버리지(광범위 유니버스 = 다수 파서) | registry + graceful skip, 어댑터별 파싱 테스트, per-ETF 에러 로깅으로 격리 |
 | 종목 매칭(채권/현금은 holding_ticker 없음) | `holding_key`로 이름 폴백 + 현금/노이즈 제외 |
 | 준투명(ANT) ETF는 일별 미공시 | `discloses_daily=False`로 분류, diff 대상 제외 |
 | 과거 이력 백필 불가(diff는 스냅샷 ≥2 필요) | 수집 시작 시점부터 누적. 발행사 아카이브 있으면 별도 백필 어댑터로 보강 |
 | shares 변동에 설정/환매(creation/redemption) 혼입 | 실제 매매와 유닛 증감이 섞일 수 있음 → weight_delta(배분 변화)를 보조지표로 병기, 문서에 nuance 명시 |
-| 발행사 CSV 요청 차단/rate-limit | with_backoff, 수집 간 sleep, User-Agent 설정, 실패 시 다음 배치 재시도 |
+| 펀드별 URL/다운로드 엔드포인트 변경 | 라이브 URL 검증 후 ticker→URL 하드코딩 맵 갱신, 미지원/변경 ticker는 graceful skip |
+| 발행사별 현금/파생/FX 토큰 차이 | base 정규화 + 어댑터별 제외 규칙 + fixture 테스트로 흡수 |
+| 발행사 holdings 요청 차단/rate-limit | with_backoff, 수집 간 sleep, User-Agent 설정, 실패 시 다음 배치 재시도 |
 | SQLite → Postgres 전환 | 헥사고날 포트로 DB 격리 + DATABASE_URL 교체 + 계약 테스트(1.5장) |
 | Oracle 무료 VM 포트 차단 | VCN 보안목록 **그리고** OS 방화벽(ufw/iptables) 둘 다 개방 |
 | Oracle ARM(A1) 아키텍처 | Docker 이미지 `linux/arm64` 빌드/검증, 네이티브 휠 호환 확인 |
@@ -502,7 +504,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000     # 운영: https://api.<도메
 - [x] M3 diff 엔진 + 변동 저장 + collect.py 개편
 - [x] M4 백엔드 API (holdings/changes/positions history/recent feed)
 - [x] M5 프론트 변동 UI + 종목 추세 차트 + 전체 피드 + 면책 고지
-- [ ] M6 발행사 어댑터 확장 + 스케줄러 + admin + Vercel/Oracle 배포
+- [x] M6a 발행사 어댑터 확장(멀티포맷 base + iShares DYNF + SPDR TOTL + Capital Group CGGR/CGDV + T. Rowe Price TCAF)
+- [x] M6b 스케줄러 + admin + Oracle/Caddy 배포 설정 + 운영 문서
+- [ ] M6c 실제 운영 배포 및 Vercel 연결 검증
 
 > 각 단계의 **완료 기준**을 만족하면 다음 단계로 진행한다. 단계는 독립적 PR/커밋 단위가 될 수 있다.
 > **핵심 불변식**: 실제 매매 판정은 항상 shares Δ 기준. 비중%는 가격 드리프트가 섞이므로 보조지표로만 사용한다.
