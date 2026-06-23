@@ -41,7 +41,7 @@ class ArkHoldingsProvider(CsvHoldingsProviderBase):
                 continue
 
             holding_name = (row.get("company") or "").strip()
-            holding_ticker = self._clean_holding_ticker(row.get("ticker"))
+            holding_ticker = self.clean_holding_ticker(row.get("ticker"))
             if holding_key(holding_ticker, holding_name) is None:
                 continue
 
@@ -61,11 +61,3 @@ class ArkHoldingsProvider(CsvHoldingsProviderBase):
                 )
             )
         return holdings
-
-    def _clean_holding_ticker(self, value: str | None) -> str | None:
-        if value is None:
-            return None
-        clean = value.strip().upper()
-        if clean in {"", "--", "-"}:
-            return None
-        return clean
