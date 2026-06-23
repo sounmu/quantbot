@@ -8,9 +8,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.infrastructure.db.engine import init_db
+from app.infrastructure.db.engine import SessionLocal, init_db
+from app.infrastructure.db.repositories import SqlAlchemyEtfRepository
+from app.infrastructure.external.universe import load_seed_universe
 from app.infrastructure.scheduler.jobs import create_scheduler
 from app.interfaces.api import admin, changes, etfs, meta
+
+
+async def seed_universe() -> int:
+    async with SessionLocal() as session:
+        count = await load_seed_universe(SqlAlchemyEtfRepository(session))
+        await session.commit()
+        return count
 
 
 @asynccontextmanager
@@ -20,6 +29,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     if settings.auto_create_tables:
         await init_db()
+
+    if settings.seed_universe_on_startup:
+        await seed_universe()
 
     if settings.scheduler_enabled:
         scheduler = create_scheduler(settings)

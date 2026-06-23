@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     admin_token: str = "change-me"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     auto_create_tables: bool = True
+    seed_universe_on_startup: bool = True
     scheduler_enabled: bool = False
 
     @property
