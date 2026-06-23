@@ -7,12 +7,17 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:////app/data/quantbot.db}
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
       AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-false}
+      SEED_UNIVERSE_ON_STARTUP: ${SEED_UNIVERSE_ON_STARTUP:-true}
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       COLLECT_CRON_HOUR: ${COLLECT_CRON_HOUR:-22}
+      COLLECT_CRON_MINUTE: ${COLLECT_CRON_MINUTE:-0}
+      SCHEDULER_COLLECT_PRICES: ${SCHEDULER_COLLECT_PRICES:-false}
+      SCHEDULER_LOOKBACK_DAYS: ${SCHEDULER_LOOKBACK_DAYS:-365}
       HOLDINGS_HTTP_TIMEOUT: ${HOLDINGS_HTTP_TIMEOUT:-30}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
-    expose:
-      - "8000"
+    # 호스트의 cloudflared가 터널로 연결. 루프백에만 게시해 공개 노출 차단.
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
       - api-data:/app/data
     networks:
@@ -30,4 +35,4 @@ volumes:
 
 networks:
   shared-network:
-    external: true
+    driver: bridge
