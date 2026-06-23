@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./quantbot.db"
     fmp_api_key: str | None = None
     collect_cron_hour: int = Field(default=22, ge=0, le=23)
+    collect_cron_minute: int = Field(default=0, ge=0, le=59)
+    scheduler_collect_prices: bool = False
+    scheduler_lookback_days: int = Field(default=365, ge=1)
     holdings_http_timeout: float = Field(default=30.0, gt=0)
     admin_token: str = "change-me"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"

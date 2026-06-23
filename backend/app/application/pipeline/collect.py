@@ -21,6 +21,7 @@ from app.infrastructure.external.yfinance_provider import YFinanceMarketDataProv
 
 async def collect_once(
     *,
+    job_name: str = "manual_collect",
     lookback_days: int = 365,
     collect_prices: bool = False,
     collect_holdings: bool = True,
@@ -37,7 +38,7 @@ async def collect_once(
         price_provider = YFinanceMarketDataProvider()
         holdings_registry = HoldingsProviderRegistry()
 
-        run = await runs.start("manual_collect")
+        run = await runs.start(job_name)
         processed = 0
         errors: list[str] = []
 
@@ -112,6 +113,7 @@ def main() -> None:
 
     processed = asyncio.run(
         collect_once(
+            job_name="manual_collect",
             lookback_days=args.lookback_days,
             collect_prices=args.with_prices and not args.seed_only,
             collect_holdings=not args.seed_only and not args.skip_holdings,
