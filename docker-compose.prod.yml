@@ -13,9 +13,12 @@ services:
       COLLECT_CRON_MINUTE: ${COLLECT_CRON_MINUTE:-0}
       SCHEDULER_COLLECT_PRICES: ${SCHEDULER_COLLECT_PRICES:-false}
       SCHEDULER_LOOKBACK_DAYS: ${SCHEDULER_LOOKBACK_DAYS:-365}
+      SCHEDULER_CATCH_UP_ON_STARTUP: ${SCHEDULER_CATCH_UP_ON_STARTUP:-true}
+      SCHEDULER_STALE_AFTER_DAYS: ${SCHEDULER_STALE_AFTER_DAYS:-1}
       HOLDINGS_HTTP_TIMEOUT: ${HOLDINGS_HTTP_TIMEOUT:-30}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
-    # 호스트의 cloudflared가 터널로 연결. 루프백에만 게시해 공개 노출 차단.
+    # Cloudflare Tunnel은 compose 내부의 http://api:8000으로 라우팅한다.
+    # 루프백 포트는 VM 내부 점검용이며 공개 노출하지 않는다.
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -23,12 +26,24 @@ services:
     networks:
       - shared-network
     restart: unless-stopped
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
     deploy:
       resources:
         limits:
           cpus: "1.0"
           memory: 1G
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: quantbot-cloudflared
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - api
+    networks:
+      - shared-network
+    restart: unless-stopped
 
 volumes:
   api-data:

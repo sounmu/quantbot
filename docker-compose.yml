@@ -6,7 +6,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:////app/data/quantbot.db}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       HOLDINGS_HTTP_TIMEOUT: ${HOLDINGS_HTTP_TIMEOUT:-30}
-      ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
       AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-true}
       SEED_UNIVERSE_ON_STARTUP: ${SEED_UNIVERSE_ON_STARTUP:-true}
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
@@ -14,6 +14,8 @@ services:
       COLLECT_CRON_MINUTE: ${COLLECT_CRON_MINUTE:-0}
       SCHEDULER_COLLECT_PRICES: ${SCHEDULER_COLLECT_PRICES:-false}
       SCHEDULER_LOOKBACK_DAYS: ${SCHEDULER_LOOKBACK_DAYS:-365}
+      SCHEDULER_CATCH_UP_ON_STARTUP: ${SCHEDULER_CATCH_UP_ON_STARTUP:-true}
+      SCHEDULER_STALE_AFTER_DAYS: ${SCHEDULER_STALE_AFTER_DAYS:-1}
     ports:
       - "8000:8000"
     volumes:
@@ -23,6 +25,8 @@ services:
   web:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     profiles: ["web"]
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
@@ -42,6 +46,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quantbot -d quantbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   api-data:

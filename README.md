@@ -84,9 +84,9 @@ COLLECT_CRON_MINUTE=0
 수동 수집과 수집 로그 확인:
 
 ```bash
-curl -X POST "http://localhost:8000/api/admin/collect" -H "x-admin-token: change-me"
-curl -X POST "http://localhost:8000/api/admin/collect?with_prices=true&lookback_days=365" -H "x-admin-token: change-me"
-curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: change-me"
+curl -X POST "http://localhost:8000/api/admin/collect" -H "x-admin-token: $ADMIN_TOKEN"
+curl -X POST "http://localhost:8000/api/admin/collect?with_prices=true&lookback_days=365" -H "x-admin-token: $ADMIN_TOKEN"
+curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: $ADMIN_TOKEN"
 ```
 
 ### 3. 프론트
@@ -109,7 +109,7 @@ docker compose up --build
 PostgreSQL 컨테이너를 함께 띄우려면:
 
 ```bash
-docker compose --profile postgres up --build
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile postgres up --build
 ```
 
 ## 주요 API
@@ -153,7 +153,8 @@ docker compose --profile postgres up --build
 
 - 프론트는 Vercel에서 `frontend/`를 프로젝트 루트로 지정합니다.
 - Vercel 환경변수 `NEXT_PUBLIC_API_BASE_URL=https://api.<domain>`을 설정합니다.
-- 백엔드는 Oracle Cloud Always Free ARM VM에서 Docker Compose로 실행할 수 있게 구성했습니다.
-- `.env.production.example`을 `.env`로 복사하고 `API_DOMAIN`, `ADMIN_TOKEN`, `CORS_ORIGINS`를 운영값으로 바꿉니다.
-- VM 보안목록과 OS 방화벽에서 80/443을 열고 `docker compose -f docker-compose.prod.yml up -d --build`를 실행합니다.
-- `docker-compose.prod.yml`은 Caddy를 함께 띄워 `API_DOMAIN`에 자동 HTTPS를 붙이고 API 컨테이너로 프록시합니다.
+- 백엔드는 Oracle Cloud Always Free ARM VM 또는 Docker Compose가 가능한 VM에서 실행하고, 공개 노출은 Cloudflare Tunnel로 처리합니다.
+- `.env.production.example`을 `.env`로 복사하고 `ADMIN_TOKEN`, `CORS_ORIGINS`, `CLOUDFLARE_TUNNEL_TOKEN`을 운영값으로 바꿉니다.
+- Cloudflare Zero Trust에서 Tunnel을 만들고 public hostname `api.<domain>`의 service URL을 `http://api:8000`으로 설정합니다.
+- VM에서 `docker compose -f docker-compose.prod.yml up -d --build`를 실행합니다.
+- Cloudflare Tunnel을 쓰면 API 컨테이너는 compose 내부 네트워크로만 공개되며, 호스트의 `127.0.0.1:8000` 포트는 VM 내부 점검용입니다. 일반적인 운영에서는 80/443 인바운드 방화벽을 열 필요가 없습니다.
