@@ -64,6 +64,8 @@ class AvantisHoldingsProvider(CsvHoldingsProviderBase):
                     as_of_date=as_of,
                     holding_name=holding_name,
                     holding_ticker=holding_ticker,
+                    security_id=self.clean_holding_ticker(row.get("cusip"))
+                    or self.clean_holding_ticker(row.get("isin")),
                     shares=self.parse_number(row.get("shareQuantity")),
                     market_value=self.parse_number(row.get("baseMarketValue")),
                     weight=weight,

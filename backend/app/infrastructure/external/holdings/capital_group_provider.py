@@ -65,6 +65,7 @@ class CapitalGroupHoldingsProvider(CsvHoldingsProviderBase):
                     as_of_date=as_of,
                     holding_name=holding_name,
                     holding_ticker=holding_ticker,
+                    security_id=self.clean_holding_ticker(row.get("cusip")),
                     shares=self.parse_number(row.get("shares or principal amount")),
                     market_value=self.parse_number(row.get("market value")),
                     weight=weight,
@@ -84,6 +85,8 @@ class CapitalGroupHoldingsProvider(CsvHoldingsProviderBase):
         parsed = self.parse_number(value)
         if parsed is None:
             return None
+        if isinstance(value, str) and "%" in value:
+            return parsed
         if abs(parsed) <= 1:
             return parsed * 100
         return parsed

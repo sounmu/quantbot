@@ -27,4 +27,3 @@ async def with_backoff(
                 await asyncio.sleep(base_delay_seconds * (2**attempt))
 
     raise ExternalProviderError(str(last_error)) from last_error
-

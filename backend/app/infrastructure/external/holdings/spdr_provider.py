@@ -63,6 +63,8 @@ class SpdrHoldingsProvider(CsvHoldingsProviderBase):
                     as_of_date=as_of,
                     holding_name=holding_name,
                     holding_ticker=holding_ticker,
+                    security_id=self.clean_holding_ticker(row.get("isin"))
+                    or self.clean_holding_ticker(raw_identifier),
                     shares=self.parse_number(row.get("par value")),
                     market_value=self.parse_number(row.get("market value")),
                     weight=weight,
@@ -84,6 +86,8 @@ class SpdrHoldingsProvider(CsvHoldingsProviderBase):
 
     def _is_excluded_row(self, holding_name: str, raw_identifier: Any) -> bool:
         text = " ".join(
-            str(value).upper() for value in (holding_name, raw_identifier) if value not in (None, "")
+            str(value).upper()
+            for value in (holding_name, raw_identifier)
+            if value not in (None, "")
         )
         return any(token in text for token in ("CASH", "US DOLLAR", "US DOLLARS", "USDOLLAR"))

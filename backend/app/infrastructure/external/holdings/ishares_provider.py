@@ -37,7 +37,9 @@ class ISharesHoldingsProvider(CsvHoldingsProviderBase):
             csv_text,
             header_contains=("Ticker", "Name", "Weight (%)"),
         )
-        return self._rows_to_holdings(normalize_ticker(ticker), rows, self._date_from_metadata(metadata))
+        return self._rows_to_holdings(
+            normalize_ticker(ticker), rows, self._date_from_metadata(metadata)
+        )
 
     def parse_json_fixture(self, ticker: str, data: dict[str, Any]) -> list[Holding]:
         return self._json_to_holdings(normalize_ticker(ticker), data)
@@ -96,7 +98,9 @@ class ISharesHoldingsProvider(CsvHoldingsProviderBase):
     ) -> list[Holding]:
         holdings: list[Holding] = []
         for row in rows:
-            holding_name = str(self._first(row, "name", "issuer name", "security name") or "").strip()
+            holding_name = str(
+                self._first(row, "name", "issuer name", "security name") or ""
+            ).strip()
             holding_ticker = self.clean_holding_ticker(self._first(row, "ticker", "issuer ticker"))
             asset_class = self._first(row, "asset class")
             if self._is_excluded_row(holding_name, holding_ticker, asset_class):

@@ -61,6 +61,7 @@ class VirtusHoldingsProvider(CsvHoldingsProviderBase):
                     as_of_date=as_of,
                     holding_name=holding_name,
                     holding_ticker=holding_ticker,
+                    security_id=self.clean_holding_ticker(row.get("security id")),
                     shares=self.parse_number(row.get("quantity")),
                     market_value=self.parse_number(row.get("(local)")),
                     weight=weight,

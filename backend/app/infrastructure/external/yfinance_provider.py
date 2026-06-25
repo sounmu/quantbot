@@ -73,4 +73,3 @@ class YFinanceMarketDataProvider:
     def _int_or_none(self, value: Any) -> int | None:
         number = self._float_or_none(value)
         return int(number) if number is not None else None
-

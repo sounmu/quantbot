@@ -32,4 +32,6 @@ def test_avantis_provider_parses_embedded_etf_holdings_and_excludes_currency() -
     assert holdings[0].shares == 1_519_300
     assert holdings[0].market_value == 290_547_151
     assert holdings[0].weight == 1.04
+    assert holdings[0].security_id == "57686G105"
     assert holdings[1].holding_ticker == "BV5LVC900"
+    assert holdings[1].security_id == "BV5LVC900"
