@@ -1,0 +1,8 @@
+"Fund Holdings as of","Jun 19, 2026"
+"Fund Name","iShares U.S. Equity Factor Rotation Active ETF"
+
+Ticker,Name,Shares,Market Value,Weight (%),Asset Class
+NVDA,NVIDIA CORP,"15,211,230","3,204,854,048.70",8.54,Equity
+AAPL,APPLE INC,"9,482,129","2,825,769,263.29",7.53,Equity
+MSFT,MICROSOFT CORP,"5,678,901","2,100,000,000.00",5.60,Equity
+USD,US Dollars,"1","1.00",0.01,Cash and/or Derivatives

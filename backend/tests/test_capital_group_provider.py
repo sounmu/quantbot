@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from datetime import date
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
 
 from app.infrastructure.external.holdings.capital_group_provider import CapitalGroupHoldingsProvider
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def test_capital_group_provider_parses_daily_holdings_xlsx_and_excludes_cash() -> None:
@@ -81,3 +84,21 @@ def test_capital_group_provider_parses_daily_holdings_xlsx_and_excludes_cash() -
     assert holdings[0].shares == 2_814_677
     assert holdings[0].market_value == 1_624_687_857.94
     assert holdings[0].weight == pytest.approx(6.57)
+
+
+def test_capital_group_provider_parses_xlsx_fixture_file() -> None:
+    xlsx_bytes = (FIXTURES / "capital_group_cggr.xlsx").read_bytes()
+
+    holdings = CapitalGroupHoldingsProvider().parse_fixture("CGGR", xlsx_bytes)
+
+    assert len(holdings) == 3  # META, MSFT, AMZN (cash row excluded)
+    assert holdings[0].ticker == "CGGR"
+    assert holdings[0].as_of_date == date(2026, 6, 18)
+    assert holdings[0].holding_name == "META PLATFORMS INC CLASS A COMMON STOCK USD.000006"
+    assert holdings[0].holding_ticker == "META"
+    assert holdings[0].security_id == "30303M102"
+    assert holdings[0].shares == 2_814_677
+    assert holdings[0].market_value == 1_624_687_857.94
+    assert holdings[0].weight == pytest.approx(6.57)
+    assert holdings[1].holding_ticker == "MSFT"
+    assert holdings[2].holding_ticker == "AMZN"

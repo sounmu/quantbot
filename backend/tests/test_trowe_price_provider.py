@@ -3,8 +3,11 @@ from __future__ import annotations
 from datetime import date
 from html import escape
 import json
+from pathlib import Path
 
 from app.infrastructure.external.holdings.trowe_price_provider import TRowePriceHoldingsProvider
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def test_trowe_price_provider_parses_embedded_full_holdings_json() -> None:
@@ -45,3 +48,20 @@ def test_trowe_price_provider_parses_embedded_full_holdings_json() -> None:
     assert holdings[0].shares == 1_772_937
     assert holdings[0].market_value == 433_288_073.43
     assert holdings[0].weight == 6.08126402
+
+
+def test_trowe_price_provider_parses_html_fixture_file() -> None:
+    html_text = (FIXTURES / "trowe_price_tcaf.html").read_text()
+
+    holdings = TRowePriceHoldingsProvider().parse_fixture("TCAF", html_text)
+
+    assert len(holdings) == 2  # AMZN, MSFT (USD cash excluded)
+    assert holdings[0].ticker == "TCAF"
+    assert holdings[0].as_of_date == date(2026, 6, 22)
+    assert holdings[0].holding_name == "AMAZON.COM INC COMMON STOCK USD.01"
+    assert holdings[0].holding_ticker == "AMZN"
+    assert holdings[0].shares == 1_772_937
+    assert holdings[0].market_value == 433_288_073.43
+    assert holdings[0].weight == 6.08126402
+    assert holdings[1].holding_ticker == "MSFT"
+    assert holdings[1].security_id == "594918104"

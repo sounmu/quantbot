@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from app.infrastructure.external.holdings.avantis_provider import AvantisHoldingsProvider
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def test_avantis_provider_parses_embedded_etf_holdings_and_excludes_currency() -> None:
@@ -25,6 +28,24 @@ def test_avantis_provider_parses_embedded_etf_holdings_and_excludes_currency() -
     holdings = AvantisHoldingsProvider().parse_fixture("AVUV", html)
 
     assert len(holdings) == 2
+    assert holdings[0].ticker == "AVUV"
+    assert holdings[0].as_of_date == date(2026, 6, 18)
+    assert holdings[0].holding_name == "MATSON INC COMMON STOCK"
+    assert holdings[0].holding_ticker == "MATX"
+    assert holdings[0].shares == 1_519_300
+    assert holdings[0].market_value == 290_547_151
+    assert holdings[0].weight == 1.04
+    assert holdings[0].security_id == "57686G105"
+    assert holdings[1].holding_ticker == "BV5LVC900"
+    assert holdings[1].security_id == "BV5LVC900"
+
+
+def test_avantis_provider_parses_html_fixture_file() -> None:
+    html_text = (FIXTURES / "avantis_avuv.html").read_text()
+
+    holdings = AvantisHoldingsProvider().parse_fixture("AVUV", html_text)
+
+    assert len(holdings) == 2  # MATX (merged) + VISCOFAN (USD excluded)
     assert holdings[0].ticker == "AVUV"
     assert holdings[0].as_of_date == date(2026, 6, 18)
     assert holdings[0].holding_name == "MATSON INC COMMON STOCK"

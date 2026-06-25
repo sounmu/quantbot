@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 from io import BytesIO
+from pathlib import Path
 
 from openpyxl import Workbook
 
 from app.infrastructure.external.holdings.spdr_provider import SpdrHoldingsProvider
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def test_spdr_provider_parses_xlsx_and_excludes_cash() -> None:
@@ -59,3 +62,20 @@ def test_spdr_provider_parses_xlsx_and_excludes_cash() -> None:
     assert holdings[0].shares == 245_450_000
     assert holdings[0].market_value == 232_463_201.23
     assert holdings[0].weight == 5.526658
+
+
+def test_spdr_provider_parses_xlsx_fixture_file() -> None:
+    xlsx_bytes = (FIXTURES / "spdr_totl.xlsx").read_bytes()
+
+    holdings = SpdrHoldingsProvider().parse_fixture("TOTL", xlsx_bytes)
+
+    assert len(holdings) == 2  # 2 bonds (cash row excluded)
+    assert holdings[0].ticker == "TOTL"
+    assert holdings[0].as_of_date == date(2026, 6, 18)
+    assert holdings[0].holding_name == "US TREASURY N/B 0.75 01/31/2028"
+    assert holdings[0].holding_ticker == "US91282CBJ99"
+    assert holdings[0].security_id == "US91282CBJ99"
+    assert holdings[0].shares == 245_450_000
+    assert holdings[0].market_value == 232_463_201.23
+    assert holdings[0].weight == 5.526658
+    assert holdings[1].holding_name == "FHLMC MULTIFAMILY STRUCTURED P/T 2.45 07/25/2029"

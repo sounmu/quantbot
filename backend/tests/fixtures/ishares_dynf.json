@@ -1,0 +1,19 @@
+{
+  "componentsByNameMap": {
+    "holdings": {
+      "containersByNameMap": {
+        "all": {
+          "dataPointsByNameMap": {
+            "asOfDate": {"formattedValue": "Jun 19, 2026", "value": 20260619},
+            "ticker": {"value": ["NVDA", "AAPL", "MSFT", "USD"]},
+            "issueName": {"value": ["NVIDIA CORP", "APPLE INC", "MICROSOFT CORP", "US Dollars"]},
+            "unitsHeld": {"value": [15211230.0, 9482129.0, 5678901.0, 1.0]},
+            "marketValue": {"value": [3204854048.70, 2825769263.29, 2100000000.00, 1.0]},
+            "holdingPercent": {"value": [8.54, 7.5294, 5.60, 0.01]},
+            "assetClass": {"value": ["Equity", "Equity", "Equity", "Cash and/or Derivatives"]}
+          }
+        }
+      }
+    }
+  }
+}
