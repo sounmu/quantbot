@@ -7,10 +7,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.entities import CollectionRun, Etf, Holding, HoldingChange, Metric, PricePoint
+from app.domain.entities import (
+    CollectionItemLog,
+    CollectionRun,
+    Etf,
+    Holding,
+    HoldingChange,
+    Metric,
+    PricePoint,
+)
 from app.domain.value_objects import ChangeType, holding_key, normalize_ticker
 from app.infrastructure.db import mappers
 from app.infrastructure.db.orm_models import (
+    CollectionItemLogORM,
     CollectionLockORM,
     CollectionRunORM,
     EtfHoldingChangeORM,
@@ -648,6 +657,63 @@ def _position_target(holding: str) -> str | None:
     if holding.startswith(("NAME:", "ID:")):
         return holding
     return holding_key(holding, "")
+
+
+class SqlAlchemyCollectionItemLogRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def log_start(
+        self,
+        run_id: int,
+        ticker: str,
+        item_type: str,
+        *,
+        etf_id: int | None = None,
+    ) -> CollectionItemLog:
+        row = CollectionItemLogORM(
+            run_id=run_id,
+            etf_id=etf_id,
+            ticker=ticker,
+            item_type=item_type,
+            status="running",
+            row_count=0,
+            started_at=datetime.now(UTC),
+        )
+        self._s.add(row)
+        # Commit immediately so the audit record is durable before the work it
+        # logs runs. Otherwise a session.rollback() of a failed item would erase
+        # this row and the failure log would lose its ticker/run linkage.
+        await self._s.commit()
+        return mappers.to_collection_item_log(row)
+
+    async def log_finish(
+        self,
+        log_id: int,
+        *,
+        status: str,
+        row_count: int = 0,
+        error: str | None = None,
+    ) -> CollectionItemLog | None:
+        row = await self._s.get(CollectionItemLogORM, log_id)
+        if row is None:
+            return None
+        row.status = status
+        row.row_count = row_count
+        row.error = error
+        row.finished_at = datetime.now(UTC)
+        await self._s.commit()
+        return mappers.to_collection_item_log(row)
+
+    async def for_run(self, run_id: int) -> list[CollectionItemLog]:
+        rows = (
+            await self._s.scalars(
+                select(CollectionItemLogORM)
+                .where(CollectionItemLogORM.run_id == run_id)
+                .order_by(CollectionItemLogORM.ticker, CollectionItemLogORM.item_type)
+            )
+        ).all()
+        return [mappers.to_collection_item_log(row) for row in rows]
 
 
 def _aware_utc(value: datetime) -> datetime:

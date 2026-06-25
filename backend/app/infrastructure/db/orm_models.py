@@ -163,6 +163,25 @@ class CollectionRunORM(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class CollectionItemLogORM(Base):
+    __tablename__ = "collection_item_log"
+    __table_args__ = (
+        Index("ix_collection_item_log_run", "run_id"),
+        Index("ix_collection_item_log_etf", "etf_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("collection_run.id", ondelete="CASCADE"))
+    etf_id: Mapped[int | None] = mapped_column(ForeignKey("etf.id", ondelete="SET NULL"))
+    ticker: Mapped[str] = mapped_column(String(16), index=True)
+    item_type: Mapped[str] = mapped_column(String(16))  # "holdings" or "prices"
+    status: Mapped[str] = mapped_column(String(16))  # "success" or "failed"
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class CollectionLockORM(Base):
     __tablename__ = "collection_lock"
 

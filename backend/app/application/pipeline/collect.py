@@ -7,10 +7,14 @@ from contextlib import asynccontextmanager
 
 from app.application.services.metric_service import MetricService
 from app.application.services.holding_change_service import HoldingChangeService
+from sqlalchemy import select
+
 from app.domain.entities import Etf, Holding
 from app.domain.value_objects import holding_key, normalize_ticker
 from app.infrastructure.db.engine import SessionLocal
+from app.infrastructure.db.orm_models import EtfORM
 from app.infrastructure.db.repositories import (
+    SqlAlchemyCollectionItemLogRepository,
     SqlAlchemyCollectionLockRepository,
     SqlAlchemyCollectionRunRepository,
     SqlAlchemyEtfRepository,
@@ -89,6 +93,7 @@ async def _collect_once_unlocked(
         holdings = SqlAlchemyHoldingRepository(session)
         changes = SqlAlchemyHoldingChangeRepository(session)
         runs = SqlAlchemyCollectionRunRepository(session)
+        item_logs = SqlAlchemyCollectionItemLogRepository(session)
         metric_service = MetricService()
         change_service = HoldingChangeService()
         price_provider = YFinanceMarketDataProvider()
@@ -104,10 +109,24 @@ async def _collect_once_unlocked(
             await session.commit()
 
             universe, _ = await etfs.list(page=1, page_size=1000)
+            # Resolve etf_id for each ticker (for item log FK)
+            etf_ids: dict[str, int] = {}
             for etf in universe:
+                row = await session.scalar(
+                    select(EtfORM).where(EtfORM.ticker == normalize_ticker(etf.ticker))
+                )
+                if row is not None:
+                    etf_ids[etf.ticker] = row.id
+
+            for etf in universe:
+                etf_id = etf_ids.get(etf.ticker)
+
                 if collect_holdings:
                     holdings_provider = holdings_registry.provider_for(etf)
                     if holdings_provider is not None:
+                        log = await item_logs.log_start(
+                            run.id or 0, etf.ticker, "holdings", etf_id=etf_id
+                        )
                         try:
                             fetched_holdings = await holdings_provider.fetch_holdings(etf)
                             fetched_holdings = prepare_holdings_batch(etf, fetched_holdings)
@@ -129,24 +148,42 @@ async def _collect_once_unlocked(
                             written_changes = await changes.upsert_many(snapshot_changes)
                             await session.commit()
                             processed += written_holdings + written_changes
+                            await item_logs.log_finish(
+                                log.id or 0,
+                                status="success",
+                                row_count=written_holdings + written_changes,
+                            )
                         except Exception as exc:  # noqa: BLE001 - partial collection should continue.
                             await session.rollback()
                             errors.append(f"{etf.ticker} holdings: {exc}")
+                            await item_logs.log_finish(
+                                log.id or 0, status="failed", error=str(exc)
+                            )
 
                 if collect_prices:
+                    log = await item_logs.log_start(
+                        run.id or 0, etf.ticker, "prices", etf_id=etf_id
+                    )
                     try:
                         fetched = await price_provider.fetch_prices(
                             etf.ticker, lookback_days=lookback_days
                         )
-                        processed += await prices.upsert_many(fetched)
+                        written = await prices.upsert_many(fetched)
+                        processed += written
                         series = await prices.series(etf.ticker, range_="1y")
                         metric = metric_service.calculate(etf.ticker, series)
                         if metric is not None:
                             await metrics.upsert(metric)
                         await session.commit()
+                        await item_logs.log_finish(
+                            log.id or 0, status="success", row_count=written
+                        )
                     except Exception as exc:  # noqa: BLE001 - partial collection should continue.
                         await session.rollback()
                         errors.append(f"{etf.ticker} prices: {exc}")
+                        await item_logs.log_finish(
+                            log.id or 0, status="failed", error=str(exc)
+                        )
 
             status = "partial" if errors and processed else "failed" if errors else "success"
             error = "\n".join(errors) if errors else None

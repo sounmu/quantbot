@@ -1,7 +1,16 @@
 from __future__ import annotations
 
-from app.domain.entities import CollectionRun, Etf, Holding, HoldingChange, Metric, PricePoint
+from app.domain.entities import (
+    CollectionItemLog,
+    CollectionRun,
+    Etf,
+    Holding,
+    HoldingChange,
+    Metric,
+    PricePoint,
+)
 from app.infrastructure.db.orm_models import (
+    CollectionItemLogORM,
     CollectionRunORM,
     EtfHoldingChangeORM,
     EtfHoldingORM,
@@ -92,4 +101,19 @@ def to_collection_run(row: CollectionRunORM) -> CollectionRun:
         finished_at=row.finished_at,
         items_processed=row.items_processed,
         error=row.error,
+    )
+
+
+def to_collection_item_log(row: CollectionItemLogORM) -> CollectionItemLog:
+    return CollectionItemLog(
+        id=row.id,
+        run_id=row.run_id,
+        etf_id=row.etf_id,
+        ticker=row.ticker,
+        item_type=row.item_type,
+        status=row.status,
+        row_count=row.row_count,
+        error=row.error,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
     )

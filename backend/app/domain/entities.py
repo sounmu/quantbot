@@ -80,3 +80,17 @@ class CollectionRun:
     finished_at: datetime | None = None
     items_processed: int = 0
     error: str | None = None
+
+
+@dataclass(slots=True)
+class CollectionItemLog:
+    id: int | None
+    run_id: int
+    ticker: str
+    item_type: str
+    status: str
+    row_count: int
+    started_at: datetime
+    etf_id: int | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
