@@ -29,8 +29,12 @@ def upgrade() -> None:
         sa.Column("is_active_etf", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("currency", sa.String(length=8), nullable=False, server_default="USD"),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.UniqueConstraint("ticker", name="uq_etf_ticker"),
     )
     op.create_index("ix_etf_issuer", "etf", ["issuer"])
@@ -51,7 +55,9 @@ def upgrade() -> None:
     op.create_table(
         "etf_metric",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("as_of", sa.Date(), nullable=False),
         sa.Column("aum", sa.Float(), nullable=True),
         sa.Column("return_1m", sa.Float(), nullable=True),
@@ -65,7 +71,9 @@ def upgrade() -> None:
     op.create_table(
         "etf_price",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("date", sa.Date(), nullable=False),
         sa.Column("open", sa.Float(), nullable=True),
         sa.Column("high", sa.Float(), nullable=True),
@@ -81,7 +89,9 @@ def upgrade() -> None:
     op.create_table(
         "etf_holding",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("as_of_date", sa.Date(), nullable=False),
         sa.Column("holding_ticker", sa.String(length=32), nullable=True),
         sa.Column("holding_name", sa.String(length=255), nullable=False),
@@ -103,4 +113,3 @@ def downgrade() -> None:
     op.drop_index("ix_etf_theme", table_name="etf")
     op.drop_index("ix_etf_issuer", table_name="etf")
     op.drop_table("etf")
-

@@ -39,6 +39,7 @@ class Holding:
     holding_ticker: str | None = None
     shares: float | None = None
     market_value: float | None = None
+    security_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -56,6 +57,7 @@ class HoldingChange:
     weight_before: float | None
     weight_after: float | None
     weight_delta: float | None
+    security_id: str | None = None
 
 
 @dataclass(slots=True)

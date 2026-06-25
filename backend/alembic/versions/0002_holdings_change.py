@@ -36,7 +36,9 @@ def upgrade() -> None:
     op.create_table(
         "etf_holding_change",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "etf_id", sa.Integer(), sa.ForeignKey("etf.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("as_of_date", sa.Date(), nullable=False),
         sa.Column("prev_date", sa.Date(), nullable=True),
         sa.Column("holding_ticker", sa.String(length=32), nullable=True),
@@ -88,4 +90,3 @@ def downgrade() -> None:
 
     with op.batch_alter_table("etf") as batch_op:
         batch_op.drop_column("discloses_daily")
-

@@ -19,7 +19,23 @@ _CASH_TOKENS = {"", "--", "-", "CASH", "USD", "US DOLLAR", "DOLLAR", "MONEYMARKE
 _CASH_NAME_TOKENS = {"CASH", "CASHEQUIVALENTS", "CASHANDEQUIVALENTS", "USD", "USDOLLAR"}
 
 
-def holding_key(holding_ticker: str | None, holding_name: str) -> str | None:
+def holding_key(
+    holding_ticker: str | None,
+    holding_name: str,
+    security_id: str | None = None,
+) -> str | None:
+    # Prefer a globally-unique security identifier (CUSIP/ISIN/SEDOL) when available.
+    # Local exchange tickers are not globally unique (e.g. "DRX" maps to both DRAX GROUP
+    # and ADF GROUP across exchanges), so ticker-only keys collide for international ETFs.
+    if security_id:
+        normalized_id = security_id.strip().upper()
+        if (
+            normalized_id
+            and normalized_id not in _CASH_TOKENS
+            and not normalized_id.startswith("999")
+        ):
+            return f"ID:{normalized_id}"
+
     if holding_ticker and holding_ticker.strip().upper() not in _CASH_TOKENS:
         return holding_ticker.strip().upper()
 

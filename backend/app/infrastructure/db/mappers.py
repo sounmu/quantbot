@@ -48,6 +48,7 @@ def to_holding(row: EtfHoldingORM) -> Holding:
         weight=row.weight,
         shares=row.shares,
         market_value=row.market_value,
+        security_id=row.security_id,
     )
 
 
@@ -66,6 +67,7 @@ def to_holding_change(row: EtfHoldingChangeORM) -> HoldingChange:
         weight_before=row.weight_before,
         weight_after=row.weight_after,
         weight_delta=row.weight_delta,
+        security_id=row.security_id,
     )
 
 

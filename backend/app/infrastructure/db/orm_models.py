@@ -81,16 +81,18 @@ class EtfHoldingORM(Base):
         UniqueConstraint(
             "etf_id",
             "as_of_date",
-            "holding_ticker",
-            "holding_name",
-            name="uq_etf_holding_snapshot_row",
+            "holding_key",
+            name="uq_etf_holding_snapshot_key",
         ),
+        Index("ix_etf_holding_position_key", "etf_id", "holding_key", "as_of_date"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     etf_id: Mapped[int] = mapped_column(ForeignKey("etf.id", ondelete="CASCADE"), index=True)
     as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    holding_key: Mapped[str] = mapped_column(String(320), index=True)
     holding_ticker: Mapped[str | None] = mapped_column(String(32), index=True)
+    security_id: Mapped[str | None] = mapped_column(String(64), index=True)
     holding_name: Mapped[str] = mapped_column(String(255))
     weight: Mapped[float] = mapped_column(Float)
     shares: Mapped[float | None] = mapped_column(Float)
@@ -105,12 +107,11 @@ class EtfHoldingChangeORM(Base):
         UniqueConstraint(
             "etf_id",
             "as_of_date",
-            "holding_ticker",
-            "holding_name",
-            name="uq_etf_holding_change_snapshot_row",
+            "holding_key",
+            name="uq_etf_holding_change_snapshot_key",
         ),
         Index("ix_etf_holding_change_etf_date", "etf_id", "as_of_date"),
-        Index("ix_etf_holding_change_position", "etf_id", "holding_ticker", "as_of_date"),
+        Index("ix_etf_holding_change_position", "etf_id", "holding_key", "as_of_date"),
         Index("ix_etf_holding_change_date", "as_of_date"),
     )
 
@@ -118,7 +119,9 @@ class EtfHoldingChangeORM(Base):
     etf_id: Mapped[int] = mapped_column(ForeignKey("etf.id", ondelete="CASCADE"), index=True)
     as_of_date: Mapped[date] = mapped_column(Date)
     prev_date: Mapped[date | None] = mapped_column(Date)
+    holding_key: Mapped[str] = mapped_column(String(320))
     holding_ticker: Mapped[str | None] = mapped_column(String(32))
+    security_id: Mapped[str | None] = mapped_column(String(64))
     holding_name: Mapped[str] = mapped_column(String(255))
     change_type: Mapped[str] = mapped_column(String(24))
     shares_before: Mapped[float | None] = mapped_column(Float)
@@ -158,3 +161,10 @@ class CollectionRunORM(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     items_processed: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class CollectionLockORM(Base):
+    __tablename__ = "collection_lock"
+
+    lock_key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
