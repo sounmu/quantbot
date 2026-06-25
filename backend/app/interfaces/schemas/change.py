@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel
+
+ChangeTypeValue = Literal["NEW", "EXIT", "INCREASE", "DECREASE", "UNCHANGED"]
 
 
 class HoldingChangeResponse(BaseModel):
@@ -11,7 +14,7 @@ class HoldingChangeResponse(BaseModel):
     prev_date: date | None = None
     holding_ticker: str | None = None
     holding_name: str
-    change_type: str
+    change_type: ChangeTypeValue
     shares_before: float | None = None
     shares_after: float | None = None
     shares_delta: float | None = None

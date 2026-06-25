@@ -56,7 +56,11 @@ async def compare_etfs(
     range_: str = Query(default="1y", alias="range", pattern="^(1m|3m|6m|1y|ytd|max)$"),
     service: EtfService = Depends(get_etf_service),
 ) -> CompareResponse:
-    ticker_list = [ticker.strip().upper() for ticker in tickers.split(",") if ticker.strip()]
+    ticker_list = sorted(
+        {ticker.strip().upper() for ticker in tickers.split(",") if ticker.strip()}
+    )
+    if len(ticker_list) > 10:
+        raise HTTPException(status_code=422, detail="A maximum of 10 tickers can be compared")
     result = await service.compare(ticker_list, range_=range_)
     return CompareResponse(
         items=[_to_compare_item(item) for item in result.items],
@@ -81,6 +85,7 @@ async def get_prices(
     range_: str = Query(default="1y", alias="range", pattern="^(1m|3m|6m|1y|ytd|max)$"),
     service: EtfService = Depends(get_etf_service),
 ) -> list[PricePointResponse]:
+    await _require_etf(ticker, service)
     prices = await service.get_prices(ticker, range_=range_)
     return [
         PricePointResponse(
@@ -102,6 +107,7 @@ async def get_holdings(
     as_of_date: date | None = Query(default=None, alias="date"),
     service: EtfService = Depends(get_etf_service),
 ) -> list[HoldingResponse]:
+    await _require_etf(ticker, service)
     holdings = await service.get_holdings(ticker, as_of_date=as_of_date)
     changes = await service.get_holding_changes(
         ticker,
@@ -111,12 +117,14 @@ async def get_holdings(
     changes_by_key = {
         key: change
         for change in changes
-        if (key := holding_key(change.holding_ticker, change.holding_name))
+        if (key := holding_key(change.holding_ticker, change.holding_name, change.security_id))
     }
     return [
         HoldingResponse(
             as_of_date=holding.as_of_date,
+            holding_key=key,
             holding_ticker=holding.holding_ticker,
+            security_id=holding.security_id,
             holding_name=holding.holding_name,
             weight=holding.weight,
             shares=holding.shares,
@@ -127,7 +135,11 @@ async def get_holdings(
             weight_delta=change.weight_delta if change else None,
         )
         for holding in holdings
-        for change in [changes_by_key.get(holding_key(holding.holding_ticker, holding.holding_name))]
+        for key in [
+            holding_key(holding.holding_ticker, holding.holding_name, holding.security_id)
+        ]
+        if key is not None
+        for change in [changes_by_key.get(key)]
     ]
 
 
@@ -136,6 +148,7 @@ async def get_holding_dates(
     ticker: str,
     service: EtfService = Depends(get_etf_service),
 ) -> list[date]:
+    await _require_etf(ticker, service)
     return await service.get_holding_dates(ticker)
 
 
@@ -146,6 +159,7 @@ async def get_holding_changes(
     include_unchanged: bool = False,
     service: EtfService = Depends(get_etf_service),
 ) -> list[HoldingChangeResponse]:
+    await _require_etf(ticker, service)
     changes = await service.get_holding_changes(
         ticker,
         as_of_date=as_of_date,
@@ -154,12 +168,15 @@ async def get_holding_changes(
     return [_to_change_response(change) for change in changes]
 
 
-@router.get("/{ticker}/positions/{holding}/history", response_model=list[PositionHistoryPointResponse])
+@router.get(
+    "/{ticker}/positions/{holding}/history", response_model=list[PositionHistoryPointResponse]
+)
 async def get_position_history(
     ticker: str,
     holding: str,
     service: EtfService = Depends(get_etf_service),
 ) -> list[PositionHistoryPointResponse]:
+    await _require_etf(ticker, service)
     history = await service.get_position_history(ticker, holding)
     return [
         PositionHistoryPointResponse(
@@ -226,3 +243,8 @@ def _to_change_response(change: HoldingChange) -> HoldingChangeResponse:
         weight_after=change.weight_after,
         weight_delta=change.weight_delta,
     )
+
+
+async def _require_etf(ticker: str, service: EtfService) -> None:
+    if await service.get_detail(ticker) is None:
+        raise HTTPException(status_code=404, detail="ETF not found")

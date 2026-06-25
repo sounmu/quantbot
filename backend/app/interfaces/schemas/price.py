@@ -13,4 +13,3 @@ class PricePointResponse(BaseModel):
     close: float
     nav: float | None = None
     volume: int | None = None
-

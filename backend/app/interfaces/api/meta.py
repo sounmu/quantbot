@@ -16,4 +16,3 @@ async def list_issuers(service: EtfService = Depends(get_etf_service)) -> list[s
 @router.get("/themes", response_model=list[str])
 async def list_themes(service: EtfService = Depends(get_etf_service)) -> list[str]:
     return await service.themes()
-

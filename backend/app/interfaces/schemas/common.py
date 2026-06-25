@@ -13,4 +13,3 @@ class CollectionRunResponse(BaseModel):
     finished_at: datetime | None
     items_processed: int
     error: str | None = None
-

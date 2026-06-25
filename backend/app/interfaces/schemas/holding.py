@@ -7,7 +7,9 @@ from pydantic import BaseModel
 
 class HoldingResponse(BaseModel):
     as_of_date: date
+    holding_key: str
     holding_ticker: str | None = None
+    security_id: str | None = None
     holding_name: str
     weight: float
     shares: float | None = None
