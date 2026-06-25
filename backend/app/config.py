@@ -7,7 +7,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     database_url: str = "sqlite+aiosqlite:///./quantbot.db"
     fmp_api_key: str | None = None
@@ -15,6 +19,8 @@ class Settings(BaseSettings):
     collect_cron_minute: int = Field(default=0, ge=0, le=59)
     scheduler_collect_prices: bool = False
     scheduler_lookback_days: int = Field(default=365, ge=1)
+    scheduler_catch_up_on_startup: bool = True
+    scheduler_stale_after_days: int = Field(default=1, ge=0)
     holdings_http_timeout: float = Field(default=30.0, gt=0)
     admin_token: str = "change-me"
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
@@ -24,7 +30,10 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        origins = [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        if "*" in origins:
+            raise ValueError("CORS_ORIGINS cannot contain '*' while credentials are enabled")
+        return origins
 
 
 @lru_cache

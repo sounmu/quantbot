@@ -5,7 +5,7 @@ import secrets
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.pipeline.collect import collect_once
+from app.application.pipeline.collect import acquire_collection_lock, collect_once
 from app.config import get_settings
 from app.infrastructure.db.engine import get_session
 from app.infrastructure.db.repositories import SqlAlchemyCollectionRunRepository
@@ -22,6 +22,8 @@ async def trigger_collect(
     x_admin_token: str | None = Header(default=None),
 ) -> dict[str, bool | int | str]:
     _require_admin(x_admin_token)
+    if not await acquire_collection_lock():
+        raise HTTPException(status_code=409, detail="Collection already running")
     job_name = "manual_collect_with_prices" if with_prices else "manual_collect"
     background_tasks.add_task(
         collect_once,
@@ -29,6 +31,7 @@ async def trigger_collect(
         lookback_days=lookback_days,
         collect_prices=with_prices,
         collect_holdings=True,
+        lock_already_acquired=True,
     )
     return {
         "status": "scheduled",
@@ -55,7 +58,7 @@ async def list_runs(
             started_at=run.started_at,
             finished_at=run.finished_at,
             items_processed=run.items_processed,
-            error=run.error,
+            error=_summarize_error(run.error),
         )
         for run in runs
     ]
@@ -63,5 +66,16 @@ async def list_runs(
 
 def _require_admin(token: str | None) -> None:
     settings = get_settings()
+    if settings.admin_token in {"", "change-me", "replace-with-a-long-random-token"}:
+        raise HTTPException(status_code=503, detail="Admin token is not configured")
     if token is None or not secrets.compare_digest(token, settings.admin_token):
         raise HTTPException(status_code=401, detail="Invalid admin token")
+
+
+def _summarize_error(error: str | None) -> str | None:
+    if error is None:
+        return None
+    lines = [line for line in error.splitlines() if line.strip()]
+    if not lines:
+        return None
+    return f"{len(lines)} collection error(s); check server logs for details"
