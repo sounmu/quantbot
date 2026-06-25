@@ -5,11 +5,13 @@ import type { Holding } from "@/lib/types";
 
 type Props = {
   holdings: Holding[];
+  isLoading?: boolean;
+  errorMessage?: string;
   selectedKey?: string | null;
   onSelect?: (holdingKey: string, label: string) => void;
 };
 
-export function HoldingsTable({ holdings, selectedKey, onSelect }: Props) {
+export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, onSelect }: Props) {
   return (
     <div className="overflow-hidden rounded-lg border border-line bg-white shadow-soft">
       <div className="overflow-x-auto">
@@ -35,7 +37,19 @@ export function HoldingsTable({ holdings, selectedKey, onSelect }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {holdings.length === 0 ? (
+            {errorMessage ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-berry">
+                  {errorMessage}
+                </td>
+              </tr>
+            ) : isLoading ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted">
+                  불러오는 중
+                </td>
+              </tr>
+            ) : holdings.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-muted">
                   보유종목 데이터 없음
@@ -48,7 +62,16 @@ export function HoldingsTable({ holdings, selectedKey, onSelect }: Props) {
                   <tr
                     key={`${holding.as_of_date}-${holding.holding_ticker}-${holding.holding_name}`}
                     className={`cursor-pointer hover:bg-panel/70 ${selectedKey === key ? "bg-panel" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedKey === key}
                     onClick={() => onSelect?.(key, holding.holding_ticker ?? holding.holding_name)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect?.(key, holding.holding_ticker ?? holding.holding_name);
+                      }
+                    }}
                   >
                     <td className="px-3 py-3 align-middle">
                       <ChangeBadge type={holding.change_type} compact />
@@ -79,10 +102,20 @@ export function HoldingsTable({ holdings, selectedKey, onSelect }: Props) {
 }
 
 function formatNumber(value: number | null) {
-  return value === null ? "-" : Math.round(value).toLocaleString();
+  if (value === null) {
+    return "-";
+  }
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 4
+  });
 }
 
 function positionKey(holding: Holding) {
+  // The backend supplies the canonical holding_key (ID:/NAME:/ticker); use it verbatim so
+  // positions with non-unique tickers (e.g. international cross-listings) stay distinct.
+  if (holding.holding_key) {
+    return holding.holding_key;
+  }
   if (holding.holding_ticker) {
     return holding.holding_ticker;
   }

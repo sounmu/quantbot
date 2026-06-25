@@ -37,6 +37,12 @@ export default function EtfDetailPage() {
   const watchlist = useWatchlist();
 
   useEffect(() => {
+    setSnapshotDate(undefined);
+    setSelectedPosition(null);
+    setSelectedPositionLabel(null);
+  }, [ticker]);
+
+  useEffect(() => {
     if (!snapshotDate && holdingDates.data?.length) {
       setSnapshotDate(holdingDates.data[0]);
     }
@@ -45,7 +51,7 @@ export default function EtfDetailPage() {
   useEffect(() => {
     if (!selectedPosition && holdings.data?.length) {
       const first = holdings.data[0];
-      setSelectedPosition(first.holding_ticker ?? nameKey(first.holding_name));
+      setSelectedPosition(first.holding_key ?? first.holding_ticker ?? nameKey(first.holding_name));
       setSelectedPositionLabel(first.holding_ticker ?? first.holding_name);
     }
   }, [holdings.data, selectedPosition]);
@@ -68,6 +74,8 @@ export default function EtfDetailPage() {
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-berry"
                 onClick={() => watchlist.toggle(ticker)}
                 title="관심목록"
+                aria-label={watchlist.has(ticker) ? "관심목록에서 제거" : "관심목록에 추가"}
+                aria-pressed={watchlist.has(ticker)}
               >
                 <Star
                   className="h-5 w-5"
@@ -116,6 +124,8 @@ export default function EtfDetailPage() {
       <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <HoldingsTable
           holdings={holdings.data ?? []}
+          isLoading={holdings.isLoading}
+          errorMessage={holdings.isError ? "보유종목 데이터를 불러오지 못했습니다." : undefined}
           selectedKey={selectedPosition}
           onSelect={(key, label) => {
             setSelectedPosition(key);
@@ -131,7 +141,11 @@ export default function EtfDetailPage() {
 
       <div className="mt-6">
         <h2 className="mb-3 text-lg font-semibold text-ink">스냅샷 변동 피드</h2>
-        <ChangeFeed changes={holdingChanges.data ?? []} isLoading={holdingChanges.isLoading} />
+        <ChangeFeed
+          changes={holdingChanges.data ?? []}
+          isLoading={holdingChanges.isLoading}
+          errorMessage={holdingChanges.isError ? "스냅샷 변동 데이터를 불러오지 못했습니다." : undefined}
+        />
       </div>
 
       <div className="mb-3 mt-6 flex items-center justify-between">
@@ -170,13 +184,6 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
 
 function formatPercent(value: number | null) {
   return value === null ? "-" : `${value.toFixed(2)}%`;
-}
-
-function formatReturn(value: number | null) {
-  if (value === null) {
-    return "-";
-  }
-  return <span className={value >= 0 ? "text-accent" : "text-berry"}>{value.toFixed(2)}%</span>;
 }
 
 function nameKey(name: string) {

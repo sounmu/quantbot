@@ -19,6 +19,7 @@ export default function ChangesPage() {
       <ChangeFeed
         changes={recentChanges.data ?? []}
         isLoading={recentChanges.isLoading}
+        errorMessage={recentChanges.isError ? "최근 매매 데이터를 불러오지 못했습니다." : undefined}
         showEtf
       />
 

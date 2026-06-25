@@ -71,7 +71,7 @@ export function DeltaValue({ value, suffix }: { value: number | null; suffix: st
   const isNegative = value < 0;
   const className = isPositive ? "text-accent" : isNegative ? "text-berry" : "text-muted";
   const Icon = isPositive ? ArrowUpRight : isNegative ? ArrowDownRight : Minus;
-  const decimals = suffix === "%" ? 2 : 0;
+  const decimals = suffix === "%" ? 2 : Number.isInteger(value) ? 0 : 4;
   const formatted = value.toLocaleString(undefined, {
     maximumFractionDigits: decimals,
     minimumFractionDigits: decimals

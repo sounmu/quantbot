@@ -38,7 +38,9 @@ export type PricePoint = {
 
 export type Holding = {
   as_of_date: string;
+  holding_key: string;
   holding_ticker: string | null;
+  security_id: string | null;
   holding_name: string;
   weight: number;
   shares: number | null;

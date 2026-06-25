@@ -58,6 +58,10 @@ export function EtfTable({ items, isLoading, errorMessage, watchlist }: Props) {
                       className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-white hover:text-berry"
                       onClick={() => watchlist.toggle(item.ticker)}
                       title="관심목록"
+                      aria-label={
+                        watchlist.has(item.ticker) ? "관심목록에서 제거" : "관심목록에 추가"
+                      }
+                      aria-pressed={watchlist.has(item.ticker)}
                     >
                       <Star
                         className="h-4 w-4"
