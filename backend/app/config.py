@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     scheduler_stale_after_days: int = Field(default=1, ge=0)
     holdings_http_timeout: float = Field(default=30.0, gt=0)
     admin_token: str = "change-me"
+    admin_allowed_emails: str = ""  # comma-separated
+    admin_allowed_groups: str = ""  # comma-separated
+    admin_rate_limit_per_minute: int = Field(default=30, ge=1)
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     auto_create_tables: bool = True
     seed_universe_on_startup: bool = True
@@ -34,6 +37,16 @@ class Settings(BaseSettings):
         if "*" in origins:
             raise ValueError("CORS_ORIGINS cannot contain '*' while credentials are enabled")
         return origins
+
+    @property
+    def allowed_email_set(self) -> set[str] | None:
+        values = {email.strip().lower() for email in self.admin_allowed_emails.split(",") if email.strip()}
+        return values if values else None
+
+    @property
+    def allowed_group_set(self) -> set[str] | None:
+        values = {group.strip().lower() for group in self.admin_allowed_groups.split(",") if group.strip()}
+        return values if values else None
 
 
 @lru_cache
