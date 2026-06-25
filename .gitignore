@@ -5,6 +5,7 @@
 __pycache__/
 *.py[cod]
 *.db
+*.db.bak
 .pytest_cache/
 .ruff_cache/
 node_modules/
@@ -14,5 +15,10 @@ build/
 coverage/
 *.tsbuildinfo
 
+# 테스트 산출물
+test-results/
+playwright-report/
+
 # 내부 문서는 깃에 올리지 않는다
 docs/
+CLAUDE.md
