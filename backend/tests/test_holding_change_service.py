@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from app.application.services.holding_change_service import HoldingChangeService
 from app.domain.entities import Holding
 from app.domain.value_objects import ChangeType
@@ -52,3 +54,54 @@ def test_diff_uses_name_fallback_and_ignores_cash() -> None:
     assert changes[0].change_type == ChangeType.INCREASE
     assert changes[0].holding_ticker is None
 
+
+def test_diff_rejects_missing_shares_for_matched_holding() -> None:
+    service = HoldingChangeService()
+
+    with pytest.raises(ValueError, match="missing shares"):
+        service.diff(
+            "ARKK",
+            date(2026, 1, 2),
+            date(2026, 1, 1),
+            [Holding("ARKK", date(2026, 1, 2), "Tesla", 11, "TSLA", shares=None)],
+            [Holding("ARKK", date(2026, 1, 1), "Tesla", 10, "TSLA", shares=100)],
+        )
+
+
+def test_diff_disambiguates_same_ticker_by_security_id() -> None:
+    # International ETFs (e.g. AVDV) reuse local exchange tickers across different companies.
+    # The security identifier keeps them distinct instead of colliding on the shared ticker.
+    service = HoldingChangeService(shares_epsilon=1)
+    current = [
+        Holding(
+            "AVDV", date(2026, 1, 2), "DRAX GROUP PLC", 1.0, "DRX", shares=100,
+            security_id="GB0009633180",
+        ),
+        Holding(
+            "AVDV", date(2026, 1, 2), "ADF GROUP INC", 0.5, "DRX", shares=50,
+            security_id="CA0008681011",
+        ),
+    ]
+
+    changes = service.diff("AVDV", date(2026, 1, 2), None, current, [])
+
+    assert len(changes) == 2
+    assert {change.holding_name for change in changes} == {"DRAX GROUP PLC", "ADF GROUP INC"}
+    assert all(change.change_type == ChangeType.NEW for change in changes)
+    assert all(change.security_id is not None for change in changes)
+
+
+def test_diff_rejects_duplicate_holding_keys() -> None:
+    service = HoldingChangeService()
+
+    with pytest.raises(ValueError, match="Duplicate holding key"):
+        service.diff(
+            "ARKK",
+            date(2026, 1, 2),
+            date(2026, 1, 1),
+            [
+                Holding("ARKK", date(2026, 1, 2), "Tesla Inc", 10, "TSLA", shares=100),
+                Holding("ARKK", date(2026, 1, 2), "Tesla Motors", 1, "TSLA", shares=10),
+            ],
+            [],
+        )

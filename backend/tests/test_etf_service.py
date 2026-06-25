@@ -28,8 +28,12 @@ async def test_list_etfs_filters_and_attaches_metrics() -> None:
         metrics=metrics,
     )
 
-    await etfs.upsert(Etf(ticker="ARKK", name="ARK Innovation ETF", issuer="ARK", theme="Innovation"))
-    await etfs.upsert(Etf(ticker="JEPI", name="JPMorgan Equity Premium Income ETF", issuer="JPMorgan"))
+    await etfs.upsert(
+        Etf(ticker="ARKK", name="ARK Innovation ETF", issuer="ARK", theme="Innovation")
+    )
+    await etfs.upsert(
+        Etf(ticker="JEPI", name="JPMorgan Equity Premium Income ETF", issuer="JPMorgan")
+    )
     await metrics.upsert(Metric(ticker="ARKK", as_of=date(2026, 1, 2), return_1y=12.3))
 
     items, total = await service.list_etfs(q="ark")

@@ -19,19 +19,13 @@ class HoldingChangeService:
         current: list[Holding],
         previous: list[Holding],
     ) -> list[HoldingChange]:
-        current_by_key = {
-            key: holding
-            for holding in current
-            if (key := holding_key(holding.holding_ticker, holding.holding_name))
-        }
-        previous_by_key = {
-            key: holding
-            for holding in previous
-            if (key := holding_key(holding.holding_ticker, holding.holding_name))
-        }
+        current_by_key = self._holdings_by_key(current)
+        previous_by_key = self._holdings_by_key(previous)
 
         return [
-            self._classify(ticker, as_of, prev_date, current_by_key.get(key), previous_by_key.get(key))
+            self._classify(
+                ticker, as_of, prev_date, current_by_key.get(key), previous_by_key.get(key)
+            )
             for key in sorted(current_by_key.keys() | previous_by_key.keys())
         ]
 
@@ -48,33 +42,31 @@ class HoldingChangeService:
         if current is None and previous is not None:
             return self._build(ticker, as_of, prev_date, current, previous, ChangeType.EXIT)
 
-        shares_delta = self._delta(
-            previous.shares if previous else None,
-            current.shares if current else None,
-        )
-        weight_delta = self._delta(
-            previous.weight if previous else None,
-            current.weight if current else None,
-        )
-
-        if shares_delta is not None:
-            if shares_delta > self._shares_epsilon:
-                change_type = ChangeType.INCREASE
-            elif shares_delta < -self._shares_epsilon:
-                change_type = ChangeType.DECREASE
-            else:
-                change_type = ChangeType.UNCHANGED
-        elif weight_delta is not None:
-            if weight_delta > self._weight_epsilon:
-                change_type = ChangeType.INCREASE
-            elif weight_delta < -self._weight_epsilon:
-                change_type = ChangeType.DECREASE
-            else:
-                change_type = ChangeType.UNCHANGED
+        if previous.shares is None or current.shares is None:
+            raise ValueError(
+                "Cannot classify matched holding with missing shares: "
+                f"{current.holding_ticker or current.holding_name}"
+            )
+        shares_delta = current.shares - previous.shares
+        if shares_delta > self._shares_epsilon:
+            change_type = ChangeType.INCREASE
+        elif shares_delta < -self._shares_epsilon:
+            change_type = ChangeType.DECREASE
         else:
             change_type = ChangeType.UNCHANGED
 
         return self._build(ticker, as_of, prev_date, current, previous, change_type)
+
+    def _holdings_by_key(self, holdings: list[Holding]) -> dict[str, Holding]:
+        by_key: dict[str, Holding] = {}
+        for holding in holdings:
+            key = holding_key(holding.holding_ticker, holding.holding_name, holding.security_id)
+            if key is None:
+                continue
+            if key in by_key:
+                raise ValueError(f"Duplicate holding key in snapshot: {key}")
+            by_key[key] = holding
+        return by_key
 
     def _build(
         self,
@@ -99,6 +91,7 @@ class HoldingChangeService:
             prev_date=prev_date,
             holding_name=name_source.holding_name if name_source else "",
             holding_ticker=name_source.holding_ticker if name_source else None,
+            security_id=name_source.security_id if name_source else None,
             change_type=change_type,
             shares_before=shares_before,
             shares_after=shares_after,

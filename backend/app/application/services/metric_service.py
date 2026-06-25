@@ -6,7 +6,9 @@ from app.domain.entities import Metric, PricePoint
 
 
 class MetricService:
-    def calculate(self, ticker: str, prices: list[PricePoint], *, aum: float | None = None) -> Metric | None:
+    def calculate(
+        self, ticker: str, prices: list[PricePoint], *, aum: float | None = None
+    ) -> Metric | None:
         ordered = sorted(prices, key=lambda point: point.on)
         if not ordered:
             return None
@@ -31,4 +33,3 @@ class MetricService:
         if baseline.close <= 0:
             return None
         return round(((latest.close / baseline.close) - 1) * 100, 4)
-

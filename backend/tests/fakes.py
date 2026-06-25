@@ -22,7 +22,9 @@ class FakeEtfRepository:
         issuer = filters.get("issuer")
         theme = filters.get("theme")
         if isinstance(q, str) and q:
-            items = [item for item in items if q.upper() in item.ticker or q.lower() in item.name.lower()]
+            items = [
+                item for item in items if q.upper() in item.ticker or q.lower() in item.name.lower()
+            ]
         if isinstance(issuer, str) and issuer:
             items = [item for item in items if item.issuer == issuer]
         if isinstance(theme, str) and theme:
@@ -74,7 +76,11 @@ class FakeHoldingRepository:
         return max(dates) if dates else None
 
     async def previous_snapshot_date(self, ticker: str, before: date) -> date | None:
-        dates = {holding.as_of_date for holding in self._store.get(ticker.upper(), []) if holding.as_of_date < before}
+        dates = {
+            holding.as_of_date
+            for holding in self._store.get(ticker.upper(), [])
+            if holding.as_of_date < before
+        }
         return max(dates) if dates else None
 
     async def snapshot_dates(self, ticker: str) -> list[date]:
@@ -87,7 +93,9 @@ class FakeHoldingRepository:
         target = holding if holding.startswith("NAME:") else holding_key(holding, "")
         return [
             item
-            for item in sorted(self._store.get(ticker.upper(), []), key=lambda point: point.as_of_date)
+            for item in sorted(
+                self._store.get(ticker.upper(), []), key=lambda point: point.as_of_date
+            )
             if holding_key(item.holding_ticker, item.holding_name) == target
         ]
 
@@ -117,7 +125,9 @@ class FakeHoldingChangeRepository:
         if target_date is None:
             return []
         changes = self._store.get((ticker, target_date), [])
-        return changes if include_unchanged else [c for c in changes if c.change_type != "UNCHANGED"]
+        return (
+            changes if include_unchanged else [c for c in changes if c.change_type != "UNCHANGED"]
+        )
 
     async def for_position(self, ticker: str, holding: str) -> list[HoldingChange]:
         target = holding if holding.startswith("NAME:") else holding_key(holding, "")
@@ -157,7 +167,9 @@ class FakeMetricRepository:
 
 class FakeCollectionRunRepository:
     async def start(self, job_name: str) -> CollectionRun:
-        return CollectionRun(id=1, job_name=job_name, status="running", started_at=datetime.now(UTC))
+        return CollectionRun(
+            id=1, job_name=job_name, status="running", started_at=datetime.now(UTC)
+        )
 
     async def finish(self, run_id: int, **kwargs: object) -> CollectionRun:
         return CollectionRun(

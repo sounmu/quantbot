@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Select, delete, distinct, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -10,6 +11,7 @@ from app.domain.entities import CollectionRun, Etf, Holding, HoldingChange, Metr
 from app.domain.value_objects import ChangeType, holding_key, normalize_ticker
 from app.infrastructure.db import mappers
 from app.infrastructure.db.orm_models import (
+    CollectionLockORM,
     CollectionRunORM,
     EtfHoldingChangeORM,
     EtfHoldingORM,
@@ -92,7 +94,9 @@ class SqlAlchemyEtfRepository:
         else:
             sort_column = EtfORM.name
 
-        stmt = stmt.order_by(sort_column.desc().nullslast() if order == "desc" else sort_column.asc())
+        stmt = stmt.order_by(
+            sort_column.desc().nullslast() if order == "desc" else sort_column.asc()
+        )
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
 
         rows = (await self._s.scalars(stmt)).all()
@@ -113,23 +117,38 @@ class SqlAlchemyPriceRepository:
         self._s = session
 
     async def upsert_many(self, prices: list[PricePoint]) -> int:
-        processed = 0
+        if not prices:
+            return 0
+
+        prices_by_ticker: dict[str, list[PricePoint]] = {}
         for price in prices:
-            etf = await self._s.scalar(
-                select(EtfORM).where(EtfORM.ticker == normalize_ticker(price.ticker))
-            )
+            prices_by_ticker.setdefault(normalize_ticker(price.ticker), []).append(price)
+
+        etf_rows = (
+            await self._s.scalars(select(EtfORM).where(EtfORM.ticker.in_(list(prices_by_ticker))))
+        ).all()
+        etfs_by_ticker = {etf.ticker: etf for etf in etf_rows}
+        processed = 0
+        for ticker, ticker_prices in prices_by_ticker.items():
+            etf = etfs_by_ticker.get(ticker)
             if etf is None:
                 continue
 
-            row = await self._s.scalar(
-                select(EtfPriceORM).where(
-                    EtfPriceORM.etf_id == etf.id,
-                    EtfPriceORM.date == price.on,
+            dates = {price.on for price in ticker_prices}
+            rows = (
+                await self._s.scalars(
+                    select(EtfPriceORM).where(
+                        EtfPriceORM.etf_id == etf.id,
+                        EtfPriceORM.date.in_(dates),
+                    )
                 )
-            )
-            if row is None:
-                self._s.add(
-                    EtfPriceORM(
+            ).all()
+            rows_by_date = {row.date: row for row in rows}
+
+            for price in ticker_prices:
+                row = rows_by_date.get(price.on)
+                if row is None:
+                    row = EtfPriceORM(
                         etf_id=etf.id,
                         date=price.on,
                         open=price.open,
@@ -139,15 +158,16 @@ class SqlAlchemyPriceRepository:
                         nav=price.nav,
                         volume=price.volume,
                     )
-                )
-            else:
-                row.open = price.open
-                row.high = price.high
-                row.low = price.low
-                row.close = price.close
-                row.nav = price.nav
-                row.volume = price.volume
-            processed += 1
+                    self._s.add(row)
+                    rows_by_date[price.on] = row
+                else:
+                    row.open = price.open
+                    row.high = price.high
+                    row.low = price.low
+                    row.close = price.close
+                    row.nav = price.nav
+                    row.volume = price.volume
+                processed += 1
         return processed
 
     async def series(self, ticker: str, *, range_: str = "1y") -> list[PricePoint]:
@@ -155,7 +175,11 @@ class SqlAlchemyPriceRepository:
         if etf is None:
             return []
 
-        stmt = select(EtfPriceORM).options(selectinload(EtfPriceORM.etf)).where(EtfPriceORM.etf_id == etf.id)
+        stmt = (
+            select(EtfPriceORM)
+            .options(selectinload(EtfPriceORM.etf))
+            .where(EtfPriceORM.etf_id == etf.id)
+        )
         since = self._range_start(range_)
         if since is not None:
             stmt = stmt.where(EtfPriceORM.date >= since)
@@ -189,6 +213,7 @@ class SqlAlchemyHoldingRepository:
     async def upsert_many(self, holdings: list[Holding]) -> int:
         if not holdings:
             return 0
+        holdings = _prepare_holding_batch(holdings)
 
         etf = await self._s.scalar(
             select(EtfORM).where(EtfORM.ticker == normalize_ticker(holdings[0].ticker))
@@ -204,11 +229,16 @@ class SqlAlchemyHoldingRepository:
             )
         )
         for holding in holdings:
+            key = holding_key(holding.holding_ticker, holding.holding_name, holding.security_id)
+            if key is None:
+                continue
             self._s.add(
                 EtfHoldingORM(
                     etf_id=etf.id,
                     as_of_date=holding.as_of_date,
+                    holding_key=key,
                     holding_ticker=holding.holding_ticker,
+                    security_id=holding.security_id,
                     holding_name=holding.holding_name,
                     weight=holding.weight,
                     shares=holding.shares,
@@ -277,20 +307,18 @@ class SqlAlchemyHoldingRepository:
         if etf is None:
             return []
 
-        target = holding if holding.startswith("NAME:") else holding_key(holding, "")
+        target = _position_target(holding)
+        if target is None:
+            return []
         rows = (
             await self._s.scalars(
                 select(EtfHoldingORM)
                 .options(selectinload(EtfHoldingORM.etf))
-                .where(EtfHoldingORM.etf_id == etf.id)
+                .where(EtfHoldingORM.etf_id == etf.id, EtfHoldingORM.holding_key == target)
                 .order_by(EtfHoldingORM.as_of_date.asc())
             )
         ).all()
-        return [
-            mappers.to_holding(row)
-            for row in rows
-            if holding_key(row.holding_ticker, row.holding_name) == target
-        ]
+        return [mappers.to_holding(row) for row in rows]
 
 
 class SqlAlchemyHoldingChangeRepository:
@@ -300,6 +328,7 @@ class SqlAlchemyHoldingChangeRepository:
     async def upsert_many(self, changes: list[HoldingChange]) -> int:
         if not changes:
             return 0
+        changes = _prepare_change_batch(changes)
 
         etf = await self._s.scalar(
             select(EtfORM).where(EtfORM.ticker == normalize_ticker(changes[0].ticker))
@@ -315,12 +344,17 @@ class SqlAlchemyHoldingChangeRepository:
             )
         )
         for change in changes:
+            key = holding_key(change.holding_ticker, change.holding_name, change.security_id)
+            if key is None:
+                continue
             self._s.add(
                 EtfHoldingChangeORM(
                     etf_id=etf.id,
                     as_of_date=change.as_of_date,
                     prev_date=change.prev_date,
+                    holding_key=key,
                     holding_ticker=change.holding_ticker,
+                    security_id=change.security_id,
                     holding_name=change.holding_name,
                     change_type=change.change_type,
                     shares_before=change.shares_before,
@@ -376,20 +410,20 @@ class SqlAlchemyHoldingChangeRepository:
         if etf is None:
             return []
 
-        target = holding if holding.startswith("NAME:") else holding_key(holding, "")
+        target = _position_target(holding)
+        if target is None:
+            return []
         rows = (
             await self._s.scalars(
                 select(EtfHoldingChangeORM)
                 .options(selectinload(EtfHoldingChangeORM.etf))
-                .where(EtfHoldingChangeORM.etf_id == etf.id)
+                .where(
+                    EtfHoldingChangeORM.etf_id == etf.id, EtfHoldingChangeORM.holding_key == target
+                )
                 .order_by(EtfHoldingChangeORM.as_of_date.asc())
             )
         ).all()
-        return [
-            mappers.to_holding_change(row)
-            for row in rows
-            if holding_key(row.holding_ticker, row.holding_name) == target
-        ]
+        return [mappers.to_holding_change(row) for row in rows]
 
     async def recent(
         self,
@@ -403,8 +437,9 @@ class SqlAlchemyHoldingChangeRepository:
 
         rows = (
             await self._s.scalars(
-                stmt.order_by(EtfHoldingChangeORM.as_of_date.desc(), EtfHoldingChangeORM.id.desc())
-                .limit(limit)
+                stmt.order_by(
+                    EtfHoldingChangeORM.as_of_date.desc(), EtfHoldingChangeORM.id.desc()
+                ).limit(limit)
             )
         ).all()
         return [mappers.to_holding_change(row) for row in rows]
@@ -422,7 +457,9 @@ class SqlAlchemyMetricRepository:
         self._s = session
 
     async def upsert(self, metric: Metric) -> None:
-        etf = await self._s.scalar(select(EtfORM).where(EtfORM.ticker == normalize_ticker(metric.ticker)))
+        etf = await self._s.scalar(
+            select(EtfORM).where(EtfORM.ticker == normalize_ticker(metric.ticker))
+        )
         if etf is None:
             return
 
@@ -520,3 +557,100 @@ class SqlAlchemyCollectionRunRepository:
             )
         ).all()
         return [mappers.to_collection_run(row) for row in rows]
+
+
+class SqlAlchemyCollectionLockRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def acquire(self, lock_key: str, *, stale_after_seconds: int = 7200) -> bool:
+        now = datetime.now(UTC)
+        stale_before = now - timedelta(seconds=stale_after_seconds)
+        row = await self._s.get(CollectionLockORM, lock_key)
+        acquired_at = _aware_utc(row.acquired_at) if row is not None else None
+        if acquired_at is not None and acquired_at > stale_before:
+            return False
+        if row is None:
+            self._s.add(CollectionLockORM(lock_key=lock_key, acquired_at=now))
+        else:
+            row.acquired_at = now
+        try:
+            await self._s.flush()
+        except IntegrityError:
+            await self._s.rollback()
+            return False
+        return True
+
+    async def release(self, lock_key: str) -> None:
+        await self._s.execute(
+            delete(CollectionLockORM).where(CollectionLockORM.lock_key == lock_key)
+        )
+        await self._s.flush()
+
+
+def _prepare_holding_batch(holdings: list[Holding]) -> list[Holding]:
+    _validate_single_holding_batch(holdings)
+    merged: dict[str, Holding] = {}
+    order: list[str] = []
+    for holding in holdings:
+        key = holding_key(holding.holding_ticker, holding.holding_name, holding.security_id)
+        if key is None:
+            continue
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = holding
+            order.append(key)
+            continue
+        existing.weight += holding.weight
+        existing.shares = _sum_optional(existing.shares, holding.shares)
+        existing.market_value = _sum_optional(existing.market_value, holding.market_value)
+    return [merged[key] for key in order]
+
+
+def _prepare_change_batch(changes: list[HoldingChange]) -> list[HoldingChange]:
+    tickers = {normalize_ticker(change.ticker) for change in changes}
+    dates = {change.as_of_date for change in changes}
+    if len(tickers) != 1 or len(dates) != 1:
+        raise ValueError(
+            f"Mixed holding change batch: tickers={sorted(tickers)}, dates={sorted(dates)}"
+        )
+    seen: set[str] = set()
+    prepared: list[HoldingChange] = []
+    for change in changes:
+        key = holding_key(change.holding_ticker, change.holding_name, change.security_id)
+        if key is None:
+            continue
+        if key in seen:
+            raise ValueError(f"Duplicate holding change key in batch: {key}")
+        seen.add(key)
+        prepared.append(change)
+    return prepared
+
+
+def _validate_single_holding_batch(holdings: list[Holding]) -> None:
+    tickers = {normalize_ticker(holding.ticker) for holding in holdings}
+    dates = {holding.as_of_date for holding in holdings}
+    if len(tickers) != 1 or len(dates) != 1:
+        raise ValueError(f"Mixed holdings batch: tickers={sorted(tickers)}, dates={sorted(dates)}")
+
+
+def _sum_optional(left: float | None, right: float | None) -> float | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left + right
+
+
+def _position_target(holding: str) -> str | None:
+    # The frontend sends back the canonical holding_key from the snapshot response
+    # ("ID:..." / "NAME:..."); legacy/bare ticker values are normalized to their key.
+    if holding.startswith(("NAME:", "ID:")):
+        return holding
+    return holding_key(holding, "")
+
+
+def _aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
