@@ -575,14 +575,24 @@ class SqlAlchemyCollectionLockRepository:
     async def acquire(self, lock_key: str, *, stale_after_seconds: int = 7200) -> bool:
         now = datetime.now(UTC)
         stale_before = now - timedelta(seconds=stale_after_seconds)
-        row = await self._s.get(CollectionLockORM, lock_key)
-        acquired_at = _aware_utc(row.acquired_at) if row is not None else None
-        if acquired_at is not None and acquired_at > stale_before:
-            return False
-        if row is None:
-            self._s.add(CollectionLockORM(lock_key=lock_key, acquired_at=now))
-        else:
+        # 기존 행을 SELECT ... FOR UPDATE 로 잠근다. Postgres에서는 동시 acquire가 이
+        # 행 잠금을 기다렸다가(우리가 commit 한 뒤) 갱신된 행을 다시 읽고 False 를
+        # 반환하므로 read-check-write 사이의 TOCTOU 경쟁이 사라진다. 행 잠금을 잡고
+        # 있는 동안에는 stale 행을 그대로 in-place UPDATE 해도 안전하다.
+        # (SQLite 는 FOR UPDATE 를 무시하지만 DB 단위 쓰기 직렬화로 동등하게 보호된다.)
+        row = await self._s.scalar(
+            select(CollectionLockORM)
+            .where(CollectionLockORM.lock_key == lock_key)
+            .with_for_update()
+        )
+        if row is not None:
+            if _aware_utc(row.acquired_at) > stale_before:
+                return False
             row.acquired_at = now
+            await self._s.flush()
+            return True
+        # 행이 아직 없으면 INSERT 경쟁이며, 패자는 PK unique 제약(IntegrityError)에 걸린다.
+        self._s.add(CollectionLockORM(lock_key=lock_key, acquired_at=now))
         try:
             await self._s.flush()
         except IntegrityError:
