@@ -58,6 +58,8 @@
 html {
   min-width: 0;
   overflow-x: hidden;
+  /* 세로 스크롤바 유무로 중앙 정렬 콘텐츠가 좌우로 흔들리는 현상 방지 */
+  scrollbar-gutter: stable;
 }
 
 body {
