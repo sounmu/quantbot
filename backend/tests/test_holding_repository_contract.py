@@ -6,13 +6,27 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.domain.entities import Etf, Holding, Metric, PricePoint
+from app.domain.entities import (
+    Etf,
+    Holding,
+    HoldingChange,
+    Metric,
+    PricePoint,
+    Security,
+    SecurityPrice,
+    SignalDaily,
+)
+from app.domain.value_objects import ChangeType
 from app.infrastructure.db.orm_models import Base
 from app.infrastructure.db.repositories import (
     SqlAlchemyEtfRepository,
     SqlAlchemyHoldingRepository,
     SqlAlchemyMetricRepository,
     SqlAlchemyPriceRepository,
+    SqlAlchemySecurityPriceRepository,
+    SqlAlchemySecurityRepository,
+    SqlAlchemySignalDailyRepository,
+    SqlAlchemyHoldingChangeRepository,
 )
 
 
@@ -168,5 +182,159 @@ async def test_price_repository_upserts_existing_dates() -> None:
             (date(2026, 1, 2), 100, 10),
             (date(2026, 1, 3), 102, 12),
         ]
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_security_price_repository_upserts_existing_dates() -> None:
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+    async with session_factory() as session:
+        securities = SqlAlchemySecurityRepository(session)
+        prices = SqlAlchemySecurityPriceRepository(session)
+        await securities.upsert_many(
+            [
+                Security(
+                    security_key="AAPL",
+                    ticker="AAPL",
+                    name="Apple Inc",
+                    first_seen=date(2026, 1, 2),
+                )
+            ]
+        )
+        await prices.upsert_many(
+            [
+                SecurityPrice("AAPL", date(2026, 1, 2), close=100, adj_close=99, volume=10),
+                SecurityPrice("AAPL", date(2026, 1, 3), close=101, adj_close=100, volume=11),
+            ]
+        )
+        await prices.upsert_many(
+            [
+                SecurityPrice("AAPL", date(2026, 1, 3), close=102, adj_close=101, volume=12),
+                SecurityPrice("UNKNOWN", date(2026, 1, 3), close=1, adj_close=1),
+            ]
+        )
+        await session.commit()
+
+        assert await prices.latest_date("AAPL") == date(2026, 1, 3)
+        series = await prices.series("AAPL")
+        assert [(point.on, point.close, point.adj_close, point.volume) for point in series] == [
+            (date(2026, 1, 2), 100, 99, 10),
+            (date(2026, 1, 3), 102, 101, 12),
+        ]
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_signal_repositories_materialize_priceable_signal_universe_changes() -> None:
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+    async with session_factory() as session:
+        etfs = SqlAlchemyEtfRepository(session)
+        securities = SqlAlchemySecurityRepository(session)
+        changes = SqlAlchemyHoldingChangeRepository(session)
+        signals = SqlAlchemySignalDailyRepository(session)
+
+        await etfs.upsert(
+            Etf("ARKK", "ARK Innovation ETF", "ARK", in_signal_universe=True)
+        )
+        await etfs.upsert(
+            Etf("SMALL", "Small ETF", "Test", in_signal_universe=False)
+        )
+        await securities.upsert_many(
+            [
+                Security(
+                    security_key="TSLA",
+                    ticker="TSLA",
+                    name="Tesla Inc",
+                    first_seen=date(2026, 1, 2),
+                )
+            ]
+        )
+        await changes.upsert_many(
+            [
+                HoldingChange(
+                    "ARKK",
+                    date(2026, 1, 2),
+                    date(2026, 1, 1),
+                    "Tesla Inc",
+                    "TSLA",
+                    ChangeType.INCREASE,
+                    100,
+                    110,
+                    10,
+                    10,
+                    1,
+                    1.2,
+                    0.2,
+                )
+            ]
+        )
+        await changes.upsert_many(
+            [
+                HoldingChange(
+                    "SMALL",
+                    date(2026, 1, 2),
+                    date(2026, 1, 1),
+                    "Tesla Inc",
+                    "TSLA",
+                    ChangeType.INCREASE,
+                    100,
+                    110,
+                    10,
+                    10,
+                    1,
+                    1.2,
+                    0.2,
+                )
+            ]
+        )
+        await signals.replace_for_dates(
+            [date(2026, 1, 2)],
+            [
+                SignalDaily(
+                    security_key="TSLA",
+                    as_of_date=date(2026, 1, 2),
+                    security_ticker="TSLA",
+                    security_name="Tesla Inc",
+                    n_buying=1,
+                    n_selling=0,
+                    net_shares_flow=10,
+                    net_dollar_flow=2_000,
+                    conviction_score=1,
+                )
+            ],
+        )
+        await session.commit()
+
+        source_changes = await changes.signal_sources(as_of_date=date(2026, 1, 2))
+        assert [change.ticker for change in source_changes] == ["ARKK"]
+
+        participants = await changes.signal_participants("TSLA", as_of_date=date(2026, 1, 2))
+        assert [(participant.etf_ticker, participant.direction) for participant in participants] == [
+            ("ARKK", "BUY")
+        ]
+
+        daily = await signals.daily(as_of_date=date(2026, 1, 2))
+        assert daily[0].security_ticker == "TSLA"
+        assert daily[0].conviction_score == 1
 
     await engine.dispose()

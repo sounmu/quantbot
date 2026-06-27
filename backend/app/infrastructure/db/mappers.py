@@ -8,6 +8,10 @@ from app.domain.entities import (
     HoldingChange,
     Metric,
     PricePoint,
+    Security,
+    SecurityPrice,
+    SignalDaily,
+    SignalOutcome,
 )
 from app.infrastructure.db.orm_models import (
     CollectionItemLogORM,
@@ -17,6 +21,10 @@ from app.infrastructure.db.orm_models import (
     EtfMetricORM,
     EtfORM,
     EtfPriceORM,
+    SecurityORM,
+    SecurityPriceORM,
+    SignalDailyORM,
+    SignalOutcomeORM,
 )
 
 
@@ -49,6 +57,55 @@ def to_price(row: EtfPriceORM) -> PricePoint:
         close=row.close,
         nav=row.nav,
         volume=row.volume,
+    )
+
+
+def to_security(row: SecurityORM) -> Security:
+    return Security(
+        security_key=row.security_key,
+        ticker=row.ticker,
+        name=row.name,
+        first_seen=row.first_seen,
+        is_priceable=row.is_priceable,
+    )
+
+
+def to_security_price(row: SecurityPriceORM) -> SecurityPrice:
+    return SecurityPrice(
+        security_key=row.security_key,
+        on=row.date,
+        close=row.close,
+        adj_close=row.adj_close,
+        volume=row.volume,
+    )
+
+
+def to_signal_daily(row: SignalDailyORM) -> SignalDaily:
+    return SignalDaily(
+        security_key=row.security_key,
+        as_of_date=row.as_of_date,
+        security_ticker=row.security.ticker,
+        security_name=row.security.name,
+        n_buying=row.n_buying,
+        n_selling=row.n_selling,
+        net_shares_flow=row.net_shares_flow,
+        net_dollar_flow=row.net_dollar_flow,
+        conviction_score=row.conviction_score,
+    )
+
+
+def to_signal_outcome(row: SignalOutcomeORM) -> SignalOutcome:
+    return SignalOutcome(
+        security_key=row.security_key,
+        as_of_date=row.as_of_date,
+        horizon_days=row.horizon_days,
+        benchmark_key=row.benchmark_key,
+        start_date=row.start_date,
+        end_date=row.end_date,
+        stock_return=row.stock_return,
+        benchmark_return=row.benchmark_return,
+        excess_return=row.excess_return,
+        signal_score=row.signal_score,
     )
 
 

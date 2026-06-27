@@ -2,8 +2,20 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from app.domain.entities import CollectionRun, Etf, Holding, HoldingChange, Metric, PricePoint
-from app.domain.value_objects import holding_key
+from app.domain.entities import (
+    CollectionRun,
+    Etf,
+    Holding,
+    HoldingChange,
+    Metric,
+    PricePoint,
+    Security,
+    SecurityPrice,
+    SignalDaily,
+    SignalOutcome,
+    SignalParticipant,
+)
+from app.domain.value_objects import ChangeType, SignalDirection, holding_key
 
 
 class FakeEtfRepository:
@@ -49,6 +61,128 @@ class FakePriceRepository:
 
     async def series(self, ticker: str, *, range_: str = "1y") -> list[PricePoint]:
         return sorted(self._store.get(ticker.upper(), []), key=lambda point: point.on)
+
+
+class FakeSecurityRepository:
+    def __init__(self) -> None:
+        self._store: dict[str, Security] = {}
+
+    async def upsert_many(self, securities: list[Security]) -> int:
+        for security in securities:
+            existing = self._store.get(security.security_key)
+            if existing is not None and existing.first_seen < security.first_seen:
+                security.first_seen = existing.first_seen
+            self._store[security.security_key] = security
+        return len(securities)
+
+    async def get(self, security_key: str) -> Security | None:
+        return self._store.get(security_key)
+
+    async def list_priceable(self) -> list[Security]:
+        return sorted(
+            [security for security in self._store.values() if security.is_priceable],
+            key=lambda security: security.ticker,
+        )
+
+
+class FakeSecurityPriceRepository:
+    def __init__(self) -> None:
+        self._store: dict[str, list[SecurityPrice]] = {}
+
+    async def upsert_many(self, prices: list[SecurityPrice]) -> int:
+        for price in prices:
+            series = self._store.setdefault(price.security_key, [])
+            series[:] = [existing for existing in series if existing.on != price.on]
+            series.append(price)
+        return len(prices)
+
+    async def series(self, security_key: str) -> list[SecurityPrice]:
+        return sorted(self._store.get(security_key, []), key=lambda point: point.on)
+
+    async def latest_date(self, security_key: str) -> date | None:
+        dates = {price.on for price in self._store.get(security_key, [])}
+        return max(dates) if dates else None
+
+    async def latest_adj_close_by_security(
+        self,
+        security_keys: list[str],
+        *,
+        on_or_before: date,
+    ) -> dict[str, float]:
+        result: dict[str, float] = {}
+        for key in security_keys:
+            eligible = [
+                price for price in self._store.get(key, []) if price.on <= on_or_before
+            ]
+            if eligible:
+                result[key] = max(eligible, key=lambda price: price.on).adj_close
+        return result
+
+
+class FakeSignalDailyRepository:
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, date], SignalDaily] = {}
+
+    async def replace_for_dates(self, dates: list[date], signals: list[SignalDaily]) -> int:
+        target_dates = set(dates)
+        self._store = {
+            key: value for key, value in self._store.items() if value.as_of_date not in target_dates
+        }
+        for signal in signals:
+            self._store[(signal.security_key, signal.as_of_date)] = signal
+        return len(signals)
+
+    async def latest_date(self) -> date | None:
+        dates = {signal.as_of_date for signal in self._store.values()}
+        return max(dates) if dates else None
+
+    async def daily(
+        self,
+        *,
+        as_of_date: date | None = None,
+        limit: int = 100,
+    ) -> list[SignalDaily]:
+        target_date = as_of_date or await self.latest_date()
+        if target_date is None:
+            return []
+        signals = [
+            signal for signal in self._store.values() if signal.as_of_date == target_date
+        ]
+        return sorted(signals, key=lambda signal: signal.conviction_score, reverse=True)[:limit]
+
+    async def for_security(self, security_key: str, *, limit: int = 100) -> list[SignalDaily]:
+        signals = [
+            signal for signal in self._store.values() if signal.security_key == security_key
+        ]
+        return sorted(signals, key=lambda signal: signal.as_of_date, reverse=True)[:limit]
+
+    async def buy_signals(self) -> list[SignalDaily]:
+        return sorted(
+            [signal for signal in self._store.values() if signal.conviction_score > 0],
+            key=lambda signal: (signal.as_of_date, signal.security_key),
+        )
+
+
+class FakeSignalOutcomeRepository:
+    def __init__(self) -> None:
+        self._store: list[SignalOutcome] = []
+
+    async def replace_all(self, outcomes: list[SignalOutcome]) -> int:
+        self._store = outcomes
+        return len(outcomes)
+
+    async def list(
+        self,
+        *,
+        horizon_days: int | None = None,
+        security_key: str | None = None,
+    ) -> list[SignalOutcome]:
+        outcomes = self._store
+        if horizon_days is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.horizon_days == horizon_days]
+        if security_key is not None:
+            outcomes = [outcome for outcome in outcomes if outcome.security_key == security_key]
+        return sorted(outcomes, key=lambda outcome: (outcome.as_of_date, outcome.horizon_days))
 
 
 class FakeHoldingRepository:
@@ -149,6 +283,47 @@ class FakeHoldingChangeRepository:
         if change_types:
             changes = [change for change in changes if change.change_type in change_types]
         return sorted(changes, key=lambda change: change.as_of_date, reverse=True)[:limit]
+
+    async def signal_sources(self, *, as_of_date: date | None = None) -> list[HoldingChange]:
+        signal_types = {ChangeType.NEW, ChangeType.INCREASE, ChangeType.EXIT, ChangeType.DECREASE}
+        changes = [
+            change
+            for stored in self._store.values()
+            for change in stored
+            if change.change_type in signal_types
+        ]
+        if as_of_date is not None:
+            changes = [change for change in changes if change.as_of_date == as_of_date]
+        return sorted(changes, key=lambda change: (change.as_of_date, change.ticker))
+
+    async def signal_participants(
+        self,
+        security_key: str,
+        *,
+        as_of_date: date | None = None,
+    ) -> list[SignalParticipant]:
+        participants: list[SignalParticipant] = []
+        for change in await self.signal_sources(as_of_date=as_of_date):
+            if holding_key(change.holding_ticker, change.holding_name, change.security_id) != security_key:
+                continue
+            direction = (
+                SignalDirection.BUY
+                if change.change_type in {ChangeType.NEW, ChangeType.INCREASE}
+                else SignalDirection.SELL
+            )
+            participants.append(
+                SignalParticipant(
+                    etf_ticker=change.ticker,
+                    etf_name=f"{change.ticker} ETF",
+                    issuer="Test",
+                    direction=direction,
+                    change_type=change.change_type,
+                    shares_delta=change.shares_delta,
+                    shares_delta_pct=change.shares_delta_pct,
+                    weight_delta=change.weight_delta,
+                )
+            )
+        return participants
 
 
 class FakeMetricRepository:

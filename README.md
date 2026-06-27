@@ -16,9 +16,12 @@
 - T. Rowe Price 상품 페이지 embedded JSON 어댑터: TCAF
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
 - yfinance profile 기반 ETF 거래소/AUM 메타 보강과 분석 유니버스 게이팅
+- 분석 유니버스 보유종목 security master와 underlying 일별 `adj_close` 가격 저장소
+- ETF 횡단 daily signal 머티리얼라이즈(`signal_daily`): n_buying/n_selling, net flow, conviction score
+- forward 초과수익 평가 엔진(`signal_outcome`): hit rate, 평균/중앙값 excess return, IC
 - APScheduler 기반 일일 자동 수집과 admin 수동 수집 API
 - ETF별 holdings 날짜, 스냅샷, 변동, 종목 이력, 전체 최근 매매 피드 API
-- Next.js App Router 프론트: PC 중심 반응형 셸(데스크탑 좌측 사이드바·와이드 콘텐츠, 모바일 하단 탭), ETF/holdings/최근 매매 데이터 테이블(모바일은 카드), shares 증가 분석 보드, 가격/비교 차트, 라이트/다크 모드 토글
+- Next.js App Router 프론트: PC 중심 반응형 셸(데스크탑 좌측 사이드바·와이드 콘텐츠, 모바일 하단 탭), ETF/holdings/최근 매매 데이터 테이블(모바일은 카드), 모바일 분석 화면(성과 horizon 토글·버킷별 hit rate/초과수익·컨빅션 보드·종목별 outcome 차트), 가격/비교 차트, 라이트/다크 모드 토글
 
 ## 아키텍처 규칙
 
@@ -72,10 +75,24 @@ curl http://localhost:8000/api/changes/recent
 uv run python -m app.application.pipeline.collect --with-prices --lookback-days 365
 ```
 
+분석용 underlying 보유종목 가격까지 함께 수집하려면:
+
+```bash
+uv run python -m app.application.pipeline.collect --with-underlying-prices --lookback-days 365
+```
+
 수집은 seed upsert 후 yfinance `Ticker.info`의 `fullExchangeName`/`exchange`,
 `totalAssets`로 ETF profile을 보강하고, `SIGNAL_MIN_AUM`과
 `SIGNAL_EXCHANGES` 기준으로 `in_signal_universe`를 재계산합니다. yfinance profile은
 공식 발행사 데이터가 아니므로 seed JSON의 `exchange`/`aum` 필드로 수동 보정할 수 있습니다.
+`--with-underlying-prices`는 현재 분석 유니버스 ETF의 최신 holdings에서 ticker가 있는
+US/US-ISIN 후보만 `security`로 등록하고, yfinance의 `Adj Close`를 `security_price`에
+증분 저장합니다. `BENCHMARK_TICKER`(기본 `QQQ`)도 같은 가격 스토어에 적재됩니다.
+holdings 또는 underlying 가격이 갱신되면 `signal_daily`도 재계산되어 여러 ETF가
+동시에 매수/매도한 종목의 conviction ranking을 제공합니다.
+이어 BUY signal(`conviction_score > 0`)은 `BENCHMARK_TICKER` 대비 1/5/20/60거래일
+forward excess return으로 평가되어 `signal_outcome`에 캐시됩니다. 진입일은
+공시일 이후 첫 가격일이라 look-ahead를 피합니다.
 
 첫 수집에는 이전 스냅샷이 없으므로 대부분 `NEW`로 표시됩니다. 두 번째 영업일 스냅샷부터 `INCREASE`, `DECREASE`, `EXIT` 변동이 의미 있게 쌓입니다.
 
@@ -85,6 +102,8 @@ uv run python -m app.application.pipeline.collect --with-prices --lookback-days 
 SCHEDULER_ENABLED=true
 COLLECT_CRON_HOUR=22
 COLLECT_CRON_MINUTE=0
+SCHEDULER_COLLECT_UNDERLYING_PRICES=false
+BENCHMARK_TICKER=QQQ
 SIGNAL_MIN_AUM=100000000
 SIGNAL_EXCHANGES=NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,NYSE,NYQ,NYSEArca,PCX,CboeUS,CboeBZX,BATS,BTS,NYSEAmerican,ASE
 ```
@@ -94,6 +113,9 @@ SIGNAL_EXCHANGES=NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,NYSE,NYQ,NYSEArca
 ```bash
 curl -X POST "http://localhost:8000/api/admin/collect" -H "x-admin-token: $ADMIN_TOKEN"
 curl -X POST "http://localhost:8000/api/admin/collect?with_prices=true&lookback_days=365" -H "x-admin-token: $ADMIN_TOKEN"
+curl -X POST "http://localhost:8000/api/admin/collect?with_underlying_prices=true&lookback_days=365" -H "x-admin-token: $ADMIN_TOKEN"
+curl -X POST "http://localhost:8000/api/admin/recompute-signals" -H "x-admin-token: $ADMIN_TOKEN"
+curl -X POST "http://localhost:8000/api/admin/recompute-analysis" -H "x-admin-token: $ADMIN_TOKEN"
 curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: $ADMIN_TOKEN"
 ```
 
@@ -131,18 +153,25 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 - `GET /api/etfs/{ticker}/changes?date=YYYY-MM-DD`
 - `GET /api/etfs/{ticker}/positions/{holding}/history`
 - `GET /api/changes/recent?types=NEW&types=INCREASE&limit=100`
+- `GET /api/signals/daily?date=YYYY-MM-DD&limit=100` — ETF 횡단 conviction 상위 종목
+- `GET /api/signals/security/{security_key}` — 한 종목의 signal 이력과 참여 ETF
+- `GET /api/analysis/performance?bucket=conviction_2_plus&horizon=20` — hit rate, 평균/중앙값 초과수익, IC
+- `GET /api/analysis/security/{security_key}` — 한 종목의 BUY signal forward return 이력
 - `GET /api/etfs/{ticker}/prices?range=1m|3m|6m|1y|ytd|max`
 - `GET /api/etfs/compare?tickers=ARKK,ARKW&range=1y`
 - `GET /api/meta/issuers`
 - `GET /api/meta/themes`
-- `POST /api/admin/collect` with `x-admin-token`
+- `POST /api/admin/collect` with `x-admin-token` — `with_prices`, `with_underlying_prices`
+- `POST /api/admin/recompute-signals` with `x-admin-token` — `date` 선택 가능
+- `POST /api/admin/recompute-analysis` with `x-admin-token`
 - `GET /api/admin/runs` with `x-admin-token`
 - `GET /api/admin/dashboard/quality` with `x-admin-token` — stale/missing shares와
   거래소/AUM/분석 유니버스 게이팅 상태
 
 ## 데이터 소스
 
-ETF 가격과 profile 메타(`exchange`, `aum`)는 yfinance를 1차 소스로 사용합니다.
+ETF 가격과 profile 메타(`exchange`, `aum`), 분석용 underlying 가격(`adj_close`)은
+yfinance를 1차 소스로 사용합니다.
 profile 메타는 발행사 공식 holdings가 아니므로, 필요하면 seed JSON의 `exchange`/`aum`
 override로 보정합니다.
 

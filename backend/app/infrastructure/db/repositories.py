@@ -15,8 +15,19 @@ from app.domain.entities import (
     HoldingChange,
     Metric,
     PricePoint,
+    Security,
+    SecurityPrice,
+    SignalDaily,
+    SignalOutcome,
+    SignalParticipant,
 )
-from app.domain.value_objects import ChangeType, holding_key, normalize_ticker
+from app.domain.value_objects import (
+    ChangeType,
+    SignalDirection,
+    holding_key,
+    normalize_security_key,
+    normalize_ticker,
+)
 from app.infrastructure.db import mappers
 from app.infrastructure.db.orm_models import (
     CollectionItemLogORM,
@@ -27,6 +38,10 @@ from app.infrastructure.db.orm_models import (
     EtfMetricORM,
     EtfORM,
     EtfPriceORM,
+    SecurityORM,
+    SecurityPriceORM,
+    SignalDailyORM,
+    SignalOutcomeORM,
 )
 
 
@@ -221,6 +236,280 @@ class SqlAlchemyPriceRepository:
                 return None
             case _:
                 return today - timedelta(days=366)
+
+
+class SqlAlchemySecurityRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def upsert_many(self, securities: list[Security]) -> int:
+        if not securities:
+            return 0
+
+        processed = 0
+        for security in securities:
+            key = normalize_security_key(security.security_key)
+            row = await self._s.get(SecurityORM, key)
+            if row is None:
+                self._s.add(
+                    SecurityORM(
+                        security_key=key,
+                        ticker=normalize_ticker(security.ticker),
+                        name=security.name,
+                        first_seen=security.first_seen,
+                        is_priceable=security.is_priceable,
+                    )
+                )
+                processed += 1
+                continue
+
+            row.ticker = normalize_ticker(security.ticker)
+            row.name = security.name
+            row.first_seen = min(row.first_seen, security.first_seen)
+            row.is_priceable = security.is_priceable
+            processed += 1
+        return processed
+
+    async def get(self, security_key: str) -> Security | None:
+        row = await self._s.get(SecurityORM, normalize_security_key(security_key))
+        return mappers.to_security(row) if row else None
+
+    async def list_priceable(self) -> list[Security]:
+        rows = (
+            await self._s.scalars(
+                select(SecurityORM)
+                .where(SecurityORM.is_priceable.is_(True))
+                .order_by(SecurityORM.ticker.asc())
+            )
+        ).all()
+        return [mappers.to_security(row) for row in rows]
+
+
+class SqlAlchemySecurityPriceRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def upsert_many(self, prices: list[SecurityPrice]) -> int:
+        if not prices:
+            return 0
+
+        prices_by_key: dict[str, list[SecurityPrice]] = {}
+        for price in prices:
+            prices_by_key.setdefault(normalize_security_key(price.security_key), []).append(price)
+
+        existing_keys = set(
+            (
+                await self._s.scalars(
+                    select(SecurityORM.security_key).where(
+                        SecurityORM.security_key.in_(list(prices_by_key))
+                    )
+                )
+            ).all()
+        )
+        processed = 0
+        for security_key, key_prices in prices_by_key.items():
+            if security_key not in existing_keys:
+                continue
+
+            dates = {price.on for price in key_prices}
+            rows = (
+                await self._s.scalars(
+                    select(SecurityPriceORM).where(
+                        SecurityPriceORM.security_key == security_key,
+                        SecurityPriceORM.date.in_(dates),
+                    )
+                )
+            ).all()
+            rows_by_date = {row.date: row for row in rows}
+
+            for price in key_prices:
+                row = rows_by_date.get(price.on)
+                if row is None:
+                    row = SecurityPriceORM(
+                        security_key=security_key,
+                        date=price.on,
+                        close=price.close,
+                        adj_close=price.adj_close,
+                        volume=price.volume,
+                    )
+                    self._s.add(row)
+                    rows_by_date[price.on] = row
+                else:
+                    row.close = price.close
+                    row.adj_close = price.adj_close
+                    row.volume = price.volume
+                processed += 1
+        return processed
+
+    async def series(self, security_key: str) -> list[SecurityPrice]:
+        rows = (
+            await self._s.scalars(
+                select(SecurityPriceORM)
+                .where(SecurityPriceORM.security_key == normalize_security_key(security_key))
+                .order_by(SecurityPriceORM.date.asc())
+            )
+        ).all()
+        return [mappers.to_security_price(row) for row in rows]
+
+    async def latest_date(self, security_key: str) -> date | None:
+        return await self._s.scalar(
+            select(func.max(SecurityPriceORM.date)).where(
+                SecurityPriceORM.security_key == normalize_security_key(security_key)
+            )
+        )
+
+    async def latest_adj_close_by_security(
+        self,
+        security_keys: list[str],
+        *,
+        on_or_before: date,
+    ) -> dict[str, float]:
+        if not security_keys:
+            return {}
+
+        normalized_keys = [normalize_security_key(key) for key in security_keys]
+        rows = (
+            await self._s.scalars(
+                select(SecurityPriceORM)
+                .where(
+                    SecurityPriceORM.security_key.in_(normalized_keys),
+                    SecurityPriceORM.date <= on_or_before,
+                )
+                .order_by(SecurityPriceORM.security_key.asc(), SecurityPriceORM.date.desc())
+            )
+        ).all()
+
+        prices: dict[str, float] = {}
+        for row in rows:
+            if row.security_key not in prices:
+                prices[row.security_key] = row.adj_close
+        return prices
+
+
+class SqlAlchemySignalDailyRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def replace_for_dates(self, dates: list[date], signals: list[SignalDaily]) -> int:
+        target_dates = sorted(set(dates))
+        if not target_dates:
+            return 0
+
+        await self._s.execute(
+            delete(SignalDailyORM).where(SignalDailyORM.as_of_date.in_(target_dates))
+        )
+        for signal in signals:
+            self._s.add(
+                SignalDailyORM(
+                    security_key=normalize_security_key(signal.security_key),
+                    as_of_date=signal.as_of_date,
+                    n_buying=signal.n_buying,
+                    n_selling=signal.n_selling,
+                    net_shares_flow=signal.net_shares_flow,
+                    net_dollar_flow=signal.net_dollar_flow,
+                    conviction_score=signal.conviction_score,
+                )
+            )
+        return len(signals)
+
+    async def latest_date(self) -> date | None:
+        return await self._s.scalar(select(func.max(SignalDailyORM.as_of_date)))
+
+    async def daily(
+        self,
+        *,
+        as_of_date: date | None = None,
+        limit: int = 100,
+    ) -> list[SignalDaily]:
+        target_date = as_of_date or await self.latest_date()
+        if target_date is None:
+            return []
+
+        rows = (
+            await self._s.scalars(
+                select(SignalDailyORM)
+                .options(selectinload(SignalDailyORM.security))
+                .where(SignalDailyORM.as_of_date == target_date)
+                .order_by(
+                    SignalDailyORM.conviction_score.desc(),
+                    func.abs(SignalDailyORM.net_dollar_flow).desc().nullslast(),
+                    func.abs(SignalDailyORM.net_shares_flow).desc().nullslast(),
+                    SignalDailyORM.security_key.asc(),
+                )
+                .limit(limit)
+            )
+        ).all()
+        return [mappers.to_signal_daily(row) for row in rows]
+
+    async def for_security(self, security_key: str, *, limit: int = 100) -> list[SignalDaily]:
+        rows = (
+            await self._s.scalars(
+                select(SignalDailyORM)
+                .options(selectinload(SignalDailyORM.security))
+                .where(SignalDailyORM.security_key == normalize_security_key(security_key))
+                .order_by(SignalDailyORM.as_of_date.desc())
+                .limit(limit)
+            )
+        ).all()
+        return [mappers.to_signal_daily(row) for row in rows]
+
+    async def buy_signals(self) -> list[SignalDaily]:
+        rows = (
+            await self._s.scalars(
+                select(SignalDailyORM)
+                .options(selectinload(SignalDailyORM.security))
+                .where(SignalDailyORM.conviction_score > 0)
+                .order_by(SignalDailyORM.as_of_date.asc(), SignalDailyORM.security_key.asc())
+            )
+        ).all()
+        return [mappers.to_signal_daily(row) for row in rows]
+
+
+class SqlAlchemySignalOutcomeRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def replace_all(self, outcomes: list[SignalOutcome]) -> int:
+        await self._s.execute(delete(SignalOutcomeORM))
+        for outcome in outcomes:
+            self._s.add(
+                SignalOutcomeORM(
+                    security_key=normalize_security_key(outcome.security_key),
+                    as_of_date=outcome.as_of_date,
+                    horizon_days=outcome.horizon_days,
+                    benchmark_key=normalize_security_key(outcome.benchmark_key),
+                    start_date=outcome.start_date,
+                    end_date=outcome.end_date,
+                    stock_return=outcome.stock_return,
+                    benchmark_return=outcome.benchmark_return,
+                    excess_return=outcome.excess_return,
+                    signal_score=outcome.signal_score,
+                )
+            )
+        return len(outcomes)
+
+    async def list(
+        self,
+        *,
+        horizon_days: int | None = None,
+        security_key: str | None = None,
+    ) -> list[SignalOutcome]:
+        stmt = select(SignalOutcomeORM)
+        if horizon_days is not None:
+            stmt = stmt.where(SignalOutcomeORM.horizon_days == horizon_days)
+        if security_key is not None:
+            stmt = stmt.where(SignalOutcomeORM.security_key == normalize_security_key(security_key))
+
+        rows = (
+            await self._s.scalars(
+                stmt.order_by(
+                    SignalOutcomeORM.as_of_date.desc(),
+                    SignalOutcomeORM.horizon_days.asc(),
+                    SignalOutcomeORM.security_key.asc(),
+                )
+            )
+        ).all()
+        return [mappers.to_signal_outcome(row) for row in rows]
 
 
 class SqlAlchemyHoldingRepository:
@@ -461,6 +750,58 @@ class SqlAlchemyHoldingChangeRepository:
         ).all()
         return [mappers.to_holding_change(row) for row in rows]
 
+    async def signal_sources(self, *, as_of_date: date | None = None) -> list[HoldingChange]:
+        stmt = (
+            select(EtfHoldingChangeORM)
+            .options(selectinload(EtfHoldingChangeORM.etf))
+            .join(EtfORM, EtfORM.id == EtfHoldingChangeORM.etf_id)
+            .join(SecurityORM, SecurityORM.security_key == EtfHoldingChangeORM.holding_key)
+            .where(
+                EtfORM.in_signal_universe.is_(True),
+                EtfHoldingChangeORM.change_type.in_(_SIGNAL_CHANGE_TYPES),
+                SecurityORM.is_priceable.is_(True),
+            )
+        )
+        if as_of_date is not None:
+            stmt = stmt.where(EtfHoldingChangeORM.as_of_date == as_of_date)
+
+        rows = (
+            await self._s.scalars(
+                stmt.order_by(
+                    EtfHoldingChangeORM.as_of_date.asc(),
+                    EtfHoldingChangeORM.holding_key.asc(),
+                    EtfORM.ticker.asc(),
+                )
+            )
+        ).all()
+        return [mappers.to_holding_change(row) for row in rows]
+
+    async def signal_participants(
+        self,
+        security_key: str,
+        *,
+        as_of_date: date | None = None,
+    ) -> list[SignalParticipant]:
+        stmt = (
+            select(EtfHoldingChangeORM)
+            .options(selectinload(EtfHoldingChangeORM.etf))
+            .join(EtfORM, EtfORM.id == EtfHoldingChangeORM.etf_id)
+            .where(
+                EtfORM.in_signal_universe.is_(True),
+                EtfHoldingChangeORM.holding_key == normalize_security_key(security_key),
+                EtfHoldingChangeORM.change_type.in_(_SIGNAL_CHANGE_TYPES),
+            )
+        )
+        if as_of_date is not None:
+            stmt = stmt.where(EtfHoldingChangeORM.as_of_date == as_of_date)
+
+        rows = (
+            await self._s.scalars(
+                stmt.order_by(EtfHoldingChangeORM.as_of_date.desc(), EtfORM.ticker.asc())
+            )
+        ).all()
+        return [_to_signal_participant(row) for row in rows]
+
     async def _latest_change_date(self, etf_id: int) -> date | None:
         return await self._s.scalar(
             select(func.max(EtfHoldingChangeORM.as_of_date)).where(
@@ -678,6 +1019,32 @@ def _position_target(holding: str) -> str | None:
     if holding.startswith(("NAME:", "ID:")):
         return holding
     return holding_key(holding, "")
+
+
+_SIGNAL_CHANGE_TYPES = [
+    ChangeType.NEW,
+    ChangeType.INCREASE,
+    ChangeType.EXIT,
+    ChangeType.DECREASE,
+]
+
+
+def _to_signal_participant(row: EtfHoldingChangeORM) -> SignalParticipant:
+    direction = (
+        SignalDirection.BUY
+        if row.change_type in {ChangeType.NEW, ChangeType.INCREASE}
+        else SignalDirection.SELL
+    )
+    return SignalParticipant(
+        etf_ticker=row.etf.ticker,
+        etf_name=row.etf.name,
+        issuer=row.etf.issuer,
+        direction=direction,
+        change_type=row.change_type,
+        shares_delta=row.shares_delta,
+        shares_delta_pct=row.shares_delta_pct,
+        weight_delta=row.weight_delta,
+    )
 
 
 class SqlAlchemyCollectionItemLogRepository:

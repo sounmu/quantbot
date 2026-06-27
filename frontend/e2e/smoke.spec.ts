@@ -76,13 +76,17 @@ test.describe("Changes page", () => {
 });
 
 test.describe("Analysis page", () => {
-  test("renders shares-increase analysis cards", async ({ page }) => {
+  test("renders performance summary and conviction board", async ({ page }) => {
     await mockApi(page);
     await page.goto("/analysis");
 
     await expect(page.locator("h1")).toContainText("분석");
-    // 시그널 히어로(매수 신호)와 보드 카드 양쪽에 노출되므로 first로 한정
+    await expect(page.getByText("컨빅션 검증")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Hit rate")).toBeVisible();
+    await expect(page.getByText("컨빅션 보드")).toBeVisible();
     await expect(page.getByText("NVDA").first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("NVIDIA CORP").first()).toBeVisible();
+    await expect(page.getByText("누가 샀나")).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 });

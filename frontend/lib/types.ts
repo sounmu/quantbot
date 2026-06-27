@@ -86,6 +86,60 @@ export type CompareResponse = {
   series: Record<string, Array<{ date: string; close: number; normalized_return: number }>>;
 };
 
+export type SignalDirection = "BUY" | "SELL";
+
+export type SignalDaily = {
+  security_key: string;
+  as_of_date: string;
+  security_ticker: string;
+  security_name: string;
+  n_buying: number;
+  n_selling: number;
+  net_shares_flow: number | null;
+  net_dollar_flow: number | null;
+  conviction_score: number;
+};
+
+export type SignalParticipant = {
+  etf_ticker: string;
+  etf_name: string;
+  issuer: string;
+  direction: SignalDirection;
+  change_type: ChangeType;
+  shares_delta: number | null;
+  shares_delta_pct: number | null;
+  weight_delta: number | null;
+};
+
+export type SignalSecurityHistory = SignalDaily & {
+  participants: SignalParticipant[];
+};
+
+export type HorizonDays = 1 | 5 | 20 | 60;
+
+export type PerformanceBucket = "all" | "conviction_1" | "conviction_2_plus" | "conviction_3_plus";
+
+export type PerformanceSummary = {
+  bucket: PerformanceBucket;
+  horizon_days: HorizonDays;
+  sample_size: number;
+  hit_rate: number | null;
+  average_excess_return: number | null;
+  median_excess_return: number | null;
+  information_coefficient: number | null;
+};
+
+export type SecurityAnalysisPoint = {
+  as_of_date: string;
+  horizon_days: HorizonDays;
+  start_date: string;
+  end_date: string;
+  stock_return: number;
+  benchmark_return: number;
+  excess_return: number;
+  signal_score: number;
+};
+
 export type EtfQuery = {
   q?: string;
   issuer?: string;

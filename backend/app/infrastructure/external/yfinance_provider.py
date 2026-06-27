@@ -5,7 +5,7 @@ import math
 from datetime import UTC, date, datetime
 from typing import Any
 
-from app.domain.entities import EtfProfile, Holding, PricePoint
+from app.domain.entities import EtfProfile, Holding, PricePoint, Security, SecurityPrice
 from app.domain.value_objects import normalize_ticker
 from app.infrastructure.external.base import with_backoff
 
@@ -24,6 +24,17 @@ class YFinanceMarketDataProvider:
 
         async def operation() -> EtfProfile | None:
             return await asyncio.to_thread(self._fetch_profile_sync, normalized)
+
+        return await with_backoff(operation)
+
+    async def fetch_security_prices(
+        self,
+        security: Security,
+        *,
+        lookback_days: int,
+    ) -> list[SecurityPrice]:
+        async def operation() -> list[SecurityPrice]:
+            return await asyncio.to_thread(self._fetch_security_prices_sync, security, lookback_days)
 
         return await with_backoff(operation)
 
@@ -54,6 +65,38 @@ class YFinanceMarketDataProvider:
                     high=self._float_or_none(row.get("High")),
                     low=self._float_or_none(row.get("Low")),
                     close=close,
+                    volume=self._int_or_none(row.get("Volume")),
+                )
+            )
+        return points
+
+    def _fetch_security_prices_sync(
+        self,
+        security: Security,
+        lookback_days: int,
+    ) -> list[SecurityPrice]:
+        import yfinance as yf
+
+        frame = yf.Ticker(security.ticker).history(
+            period=f"{max(lookback_days, 1)}d",
+            interval="1d",
+            auto_adjust=False,
+        )
+        if frame.empty:
+            return []
+
+        points: list[SecurityPrice] = []
+        for index, row in frame.iterrows():
+            close = self._float_or_none(row.get("Close"))
+            adj_close = self._float_or_none(row.get("Adj Close")) or close
+            if close is None or adj_close is None:
+                continue
+            points.append(
+                SecurityPrice(
+                    security_key=security.security_key,
+                    on=self._date_from_index(index),
+                    close=close,
+                    adj_close=adj_close,
                     volume=self._int_or_none(row.get("Volume")),
                 )
             )

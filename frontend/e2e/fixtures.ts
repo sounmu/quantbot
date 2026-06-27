@@ -145,6 +145,129 @@ const SEEDED = {
     },
   ],
 
+  dailySignals: [
+    {
+      security_key: "ID:NVDA",
+      as_of_date: "2026-06-24",
+      security_ticker: "NVDA",
+      security_name: "NVIDIA CORP",
+      n_buying: 3,
+      n_selling: 0,
+      net_shares_flow: 421230,
+      net_dollar_flow: 52000000,
+      conviction_score: 3,
+    },
+    {
+      security_key: "ID:META",
+      as_of_date: "2026-06-24",
+      security_ticker: "META",
+      security_name: "META PLATFORMS INC",
+      n_buying: 2,
+      n_selling: 0,
+      net_shares_flow: 2814677,
+      net_dollar_flow: 180000000,
+      conviction_score: 2,
+    },
+  ],
+
+  signalHistory: [
+    {
+      security_key: "ID:NVDA",
+      as_of_date: "2026-06-24",
+      security_ticker: "NVDA",
+      security_name: "NVIDIA CORP",
+      n_buying: 3,
+      n_selling: 0,
+      net_shares_flow: 421230,
+      net_dollar_flow: 52000000,
+      conviction_score: 3,
+      participants: [
+        {
+          etf_ticker: "DYNF",
+          etf_name: "iShares U.S. Equity Factor Rotation Active ETF",
+          issuer: "BlackRock",
+          direction: "BUY",
+          change_type: "INCREASE",
+          shares_delta: 211230,
+          shares_delta_pct: 1.41,
+          weight_delta: 0.24,
+        },
+        {
+          etf_ticker: "CGGR",
+          etf_name: "Capital Group Growth ETF",
+          issuer: "Capital Group",
+          direction: "BUY",
+          change_type: "INCREASE",
+          shares_delta: 120000,
+          shares_delta_pct: 2.1,
+          weight_delta: 0.32,
+        },
+      ],
+    },
+  ],
+
+  performance: [
+    {
+      bucket: "all",
+      horizon_days: 20,
+      sample_size: 42,
+      hit_rate: 0.57,
+      average_excess_return: 0.018,
+      median_excess_return: 0.012,
+      information_coefficient: 0.21,
+    },
+    {
+      bucket: "conviction_1",
+      horizon_days: 20,
+      sample_size: 30,
+      hit_rate: 0.5,
+      average_excess_return: 0.004,
+      median_excess_return: 0.002,
+      information_coefficient: 0.05,
+    },
+    {
+      bucket: "conviction_2_plus",
+      horizon_days: 20,
+      sample_size: 12,
+      hit_rate: 0.67,
+      average_excess_return: 0.031,
+      median_excess_return: 0.024,
+      information_coefficient: 0.33,
+    },
+    {
+      bucket: "conviction_3_plus",
+      horizon_days: 20,
+      sample_size: 4,
+      hit_rate: 0.75,
+      average_excess_return: 0.044,
+      median_excess_return: 0.039,
+      information_coefficient: null,
+    },
+  ],
+
+  securityAnalysis: [
+    {
+      as_of_date: "2026-06-03",
+      horizon_days: 20,
+      start_date: "2026-06-04",
+      end_date: "2026-06-30",
+      stock_return: 0.072,
+      benchmark_return: 0.031,
+      excess_return: 0.041,
+      signal_score: 2,
+    },
+    {
+      as_of_date: "2026-06-24",
+      horizon_days: 20,
+      start_date: "2026-06-25",
+      end_date: "2026-07-23",
+      stock_return: 0.096,
+      benchmark_return: 0.037,
+      excess_return: 0.059,
+      signal_score: 3,
+    },
+  ],
+
   compare: {
     items: [
       { ticker: "DYNF", name: "iShares Factor ETF", issuer: "BlackRock", theme: "Multi-Factor", expense_ratio: 0.25, discloses_daily: true, return_1m: 2.1, return_3m: 5.8, return_ytd: 12.4, return_1y: 18.9, as_of: "2026-06-24", aum: 37500000000 },
@@ -181,6 +304,18 @@ export async function mockApi(page: Page) {
   });
   await page.route("**/api/changes/recent*", (route) => {
     route.fulfill({ status: 200, json: SEEDED.recentChanges, headers: { "Access-Control-Allow-Origin": "*" } });
+  });
+  await page.route("**/api/signals/daily*", (route) => {
+    route.fulfill({ status: 200, json: SEEDED.dailySignals, headers: { "Access-Control-Allow-Origin": "*" } });
+  });
+  await page.route("**/api/signals/security/**", (route) => {
+    route.fulfill({ status: 200, json: SEEDED.signalHistory, headers: { "Access-Control-Allow-Origin": "*" } });
+  });
+  await page.route("**/api/analysis/performance*", (route) => {
+    route.fulfill({ status: 200, json: SEEDED.performance, headers: { "Access-Control-Allow-Origin": "*" } });
+  });
+  await page.route("**/api/analysis/security/**", (route) => {
+    route.fulfill({ status: 200, json: SEEDED.securityAnalysis, headers: { "Access-Control-Allow-Origin": "*" } });
   });
   await page.route("**/api/etfs/compare*", (route) => {
     route.fulfill({ status: 200, json: SEEDED.compare, headers: { "Access-Control-Allow-Origin": "*" } });

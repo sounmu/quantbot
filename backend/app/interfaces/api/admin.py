@@ -11,12 +11,18 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.pipeline.collect import acquire_collection_lock, collect_once
+from app.application.services.evaluation_service import EvaluationService
+from app.application.services.signal_service import SignalService
 from app.config import get_settings
 from app.infrastructure.db.engine import get_session
 from app.infrastructure.db.orm_models import CollectionRunORM, EtfHoldingORM, EtfORM
 from app.infrastructure.db.repositories import (
     SqlAlchemyCollectionItemLogRepository,
     SqlAlchemyCollectionRunRepository,
+    SqlAlchemyHoldingChangeRepository,
+    SqlAlchemySecurityPriceRepository,
+    SqlAlchemySignalDailyRepository,
+    SqlAlchemySignalOutcomeRepository,
 )
 from app.interfaces.schemas.common import (
     CollectionItemLogResponse,
@@ -33,6 +39,7 @@ async def trigger_collect(
     background_tasks: BackgroundTasks,
     request: Request,
     with_prices: bool = Query(default=False),
+    with_underlying_prices: bool = Query(default=False),
     lookback_days: int = Query(default=365, ge=1, le=3650),
     x_admin_token: str | None = Header(default=None),
     x_admin_email: str | None = Header(default=None),
@@ -42,12 +49,18 @@ async def trigger_collect(
     _check_rate_limit(x_admin_token, request)
     if not await acquire_collection_lock():
         raise HTTPException(status_code=409, detail="Collection already running")
-    job_name = "manual_collect_with_prices" if with_prices else "manual_collect"
+    job_name_parts = ["manual_collect"]
+    if with_prices:
+        job_name_parts.append("with_prices")
+    if with_underlying_prices:
+        job_name_parts.append("with_underlying")
+    job_name = "_".join(job_name_parts)
     background_tasks.add_task(
         collect_once,
         job_name=job_name,
         lookback_days=lookback_days,
         collect_prices=with_prices,
+        collect_underlying_prices=with_underlying_prices,
         collect_holdings=True,
         lock_already_acquired=True,
     )
@@ -55,6 +68,7 @@ async def trigger_collect(
         "status": "scheduled",
         "job_name": job_name,
         "with_prices": with_prices,
+        "with_underlying_prices": with_underlying_prices,
         "lookback_days": lookback_days,
     }
 
@@ -256,6 +270,56 @@ async def list_run_items(
         )
         for log in logs
     ]
+
+
+@router.post("/recompute-signals")
+async def recompute_signals(
+    request: Request,
+    as_of_date: date | None = Query(default=None, alias="date"),
+    x_admin_token: str | None = Header(default=None),
+    x_admin_email: str | None = Header(default=None),
+    x_admin_group: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int | str | None]:
+    _require_admin(x_admin_token, x_admin_email, x_admin_group)
+    _check_rate_limit(x_admin_token, request)
+    service = SignalService(
+        changes=SqlAlchemyHoldingChangeRepository(session),
+        security_prices=SqlAlchemySecurityPriceRepository(session),
+        signals=SqlAlchemySignalDailyRepository(session),
+    )
+    written = await service.recompute_daily(as_of_date=as_of_date)
+    await session.commit()
+    return {
+        "status": "recomputed",
+        "date": as_of_date.isoformat() if as_of_date else None,
+        "signals": written,
+    }
+
+
+@router.post("/recompute-analysis")
+async def recompute_analysis(
+    request: Request,
+    x_admin_token: str | None = Header(default=None),
+    x_admin_email: str | None = Header(default=None),
+    x_admin_group: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int | str]:
+    _require_admin(x_admin_token, x_admin_email, x_admin_group)
+    _check_rate_limit(x_admin_token, request)
+    settings = get_settings()
+    service = EvaluationService(
+        signals=SqlAlchemySignalDailyRepository(session),
+        security_prices=SqlAlchemySecurityPriceRepository(session),
+        outcomes=SqlAlchemySignalOutcomeRepository(session),
+    )
+    written = await service.recompute(benchmark_ticker=settings.benchmark_ticker)
+    await session.commit()
+    return {
+        "status": "recomputed",
+        "benchmark_ticker": settings.benchmark_ticker,
+        "outcomes": written,
+    }
 
 
 def _summarize_error(error: str | None) -> str | None:

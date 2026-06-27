@@ -13,7 +13,7 @@ from app.infrastructure.db.engine import SessionLocal, init_db
 from app.infrastructure.db.repositories import SqlAlchemyEtfRepository, SqlAlchemyMetricRepository
 from app.infrastructure.external.universe import load_seed_universe
 from app.infrastructure.scheduler.jobs import create_scheduler
-from app.interfaces.api import admin, changes, etfs, meta
+from app.interfaces.api import admin, analysis, changes, etfs, meta, signals
 
 
 async def seed_universe() -> int:
@@ -74,6 +74,8 @@ def create_app() -> FastAPI:
 
     app.include_router(etfs.router)
     app.include_router(changes.router)
+    app.include_router(signals.router)
+    app.include_router(analysis.router)
     app.include_router(meta.router)
     app.include_router(admin.router)
     return app

@@ -222,10 +222,10 @@
 
 - [x] A. 모바일 전용 UI 전환 (셸/하단탭/카드화/PWA/모바일 E2E) — + Pretendard Variable 폰트, holdings 브라우저(필터칩·정렬·검색·더보기), 선택 종목 차트를 목록 위로 배치
 - [x] B. 유니버스 정제 (거래소·AUM 메타 + 게이팅) — seed 티커 yfinance profile 실태 조사(`BTS`/Cboe US, `PCX`/NYSEArca, `NGM`/NasdaqGM, `NYQ`/NYSE) 반영, `0006_etf_exchange_aum`, `SIGNAL_MIN_AUM`/`SIGNAL_EXCHANGES`, quality/API 메타 노출 완료
-- [ ] C. Underlying security master + 가격 스토어(adj_close)
-- [ ] D. 시그널 모델 + ETF 횡단 conviction 집계
-- [ ] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단
-- [ ] F. 분석 UI (성과 화면 / 컨빅션 보드 / 종목 시그널 오버레이)
+- [x] C. Underlying security master + 가격 스토어(adj_close) — `security`/`security_price` + `0007_security_price`, `BENCHMARK_TICKER=QQQ`, `--with-underlying-prices`, ticker 있는 US/US-ISIN 후보만 가격 수집, 재실행 시 최신 적재일 기준 overlap 증분 수집
+- [x] D. 시그널 모델 + ETF 횡단 conviction 집계 — `signal_daily` + `0008_signal_daily`, `SignalService` 순수 집계, `n_buying/n_selling`·net shares/dollar flow·`conviction_score=n_buying-n_selling`, `/api/signals/daily`, `/api/signals/security/{security_key}`, admin `recompute-signals`
+- [x] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단 — `evaluation_service.py`, `signal_outcome` + `0009_signal_outcome`, `GET /api/analysis/performance`, `GET /api/analysis/security/{security_key}`, admin `recompute-analysis`, T+1 이후 가격만 쓰는 단위 테스트
+- [x] F. 분석 UI (성과 화면 / 컨빅션 보드 / 종목 시그널 오버레이) — `/analysis` 모바일 허브에 horizon 토글, 버킷별 hit rate·평균 초과수익·표본수·IC, 컨빅션 랭킹, 선택 종목 참여 ETF·forward outcome 차트, 백테스트/표본수/creation-redemption 경고 표시
 - [ ] G. (선택) 페이퍼 포트폴리오 백테스트
 
 > **핵심 불변식**: 시그널은 shares Δ로 정의하고, 평가는 항상 **벤치마크 대비 초과수익**으로, **공시 인지일 이후 가격**으로만 한다.

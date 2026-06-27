@@ -114,21 +114,24 @@ async def test_trigger_collect_schedules_requested_options(monkeypatch: pytest.M
         background_tasks,
         request=_FakeRequest(),
         with_prices=True,
+        with_underlying_prices=True,
         lookback_days=42,
         x_admin_token="secret-token-for-tests",
     )
 
     assert response == {
         "status": "scheduled",
-        "job_name": "manual_collect_with_prices",
+        "job_name": "manual_collect_with_prices_with_underlying",
         "with_prices": True,
+        "with_underlying_prices": True,
         "lookback_days": 42,
     }
     assert len(background_tasks.tasks) == 1
     assert background_tasks.tasks[0].kwargs == {
-        "job_name": "manual_collect_with_prices",
+        "job_name": "manual_collect_with_prices_with_underlying",
         "lookback_days": 42,
         "collect_prices": True,
+        "collect_underlying_prices": True,
         "collect_holdings": True,
         "lock_already_acquired": True,
     }
@@ -149,6 +152,7 @@ async def test_trigger_collect_rejects_when_collection_is_running(
             BackgroundTasks(),
             request=_FakeRequest(),
             with_prices=False,
+            with_underlying_prices=False,
             lookback_days=365,
             x_admin_token="secret-token-for-tests",
         )

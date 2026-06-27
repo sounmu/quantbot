@@ -8,7 +8,13 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from app.application.services.holding_change_service import HoldingChangeService
+from app.application.services.evaluation_service import EvaluationService
 from app.application.services.metric_service import MetricService
+from app.application.services.signal_service import SignalService
+from app.application.services.underlying_security_service import (
+    UnderlyingSecurityService,
+    incremental_price_lookback_days,
+)
 from app.application.services.universe_service import SignalUniversePolicy, refresh_signal_universe
 from sqlalchemy import select
 
@@ -26,6 +32,10 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyHoldingRepository,
     SqlAlchemyMetricRepository,
     SqlAlchemyPriceRepository,
+    SqlAlchemySecurityPriceRepository,
+    SqlAlchemySecurityRepository,
+    SqlAlchemySignalDailyRepository,
+    SqlAlchemySignalOutcomeRepository,
 )
 from app.infrastructure.external.holdings.registry import HoldingsProviderRegistry
 from app.infrastructure.external.universe import load_seed_universe
@@ -44,6 +54,7 @@ async def collect_once(
     job_name: str = "manual_collect",
     lookback_days: int = 365,
     collect_prices: bool = False,
+    collect_underlying_prices: bool = False,
     collect_holdings: bool = True,
     collect_profiles: bool = True,
     lock_already_acquired: bool = False,
@@ -53,6 +64,7 @@ async def collect_once(
             job_name=job_name,
             lookback_days=lookback_days,
             collect_prices=collect_prices,
+            collect_underlying_prices=collect_underlying_prices,
             collect_holdings=collect_holdings,
             collect_profiles=collect_profiles,
         )
@@ -90,6 +102,7 @@ async def _collect_once_unlocked(
     job_name: str,
     lookback_days: int,
     collect_prices: bool,
+    collect_underlying_prices: bool,
     collect_holdings: bool,
     collect_profiles: bool,
 ) -> int:
@@ -99,10 +112,29 @@ async def _collect_once_unlocked(
         metrics = SqlAlchemyMetricRepository(session)
         holdings = SqlAlchemyHoldingRepository(session)
         changes = SqlAlchemyHoldingChangeRepository(session)
+        securities = SqlAlchemySecurityRepository(session)
+        security_prices = SqlAlchemySecurityPriceRepository(session)
+        signals = SqlAlchemySignalDailyRepository(session)
+        outcomes = SqlAlchemySignalOutcomeRepository(session)
         runs = SqlAlchemyCollectionRunRepository(session)
         item_logs = SqlAlchemyCollectionItemLogRepository(session)
         metric_service = MetricService()
         change_service = HoldingChangeService()
+        signal_service = SignalService(
+            changes=changes,
+            security_prices=security_prices,
+            signals=signals,
+        )
+        evaluation_service = EvaluationService(
+            signals=signals,
+            security_prices=security_prices,
+            outcomes=outcomes,
+        )
+        underlying_service = UnderlyingSecurityService(
+            etfs=etfs,
+            holdings=holdings,
+            securities=securities,
+        )
         price_provider = YFinanceMarketDataProvider()
         holdings_registry = HoldingsProviderRegistry()
         settings = get_settings()
@@ -218,6 +250,66 @@ async def _collect_once_unlocked(
                             log.id or 0, status="failed", error=str(exc)
                         )
 
+            if collect_underlying_prices:
+                try:
+                    priceable_securities, written_securities = (
+                        await underlying_service.refresh_priceable_security_master(
+                            benchmark_ticker=settings.benchmark_ticker
+                        )
+                    )
+                    processed += written_securities
+                    await session.commit()
+                except Exception as exc:  # noqa: BLE001 - partial collection should continue.
+                    await session.rollback()
+                    priceable_securities = []
+                    errors.append(f"underlying security master: {exc}")
+
+                for security in priceable_securities:
+                    lookback = incremental_price_lookback_days(
+                        await security_prices.latest_date(security.security_key),
+                        requested_lookback_days=lookback_days,
+                        overlap_days=settings.underlying_price_overlap_days,
+                    )
+                    if lookback is None:
+                        continue
+
+                    log = await item_logs.log_start(
+                        run.id or 0, security.ticker, "underlying"
+                    )
+                    try:
+                        fetched = await price_provider.fetch_security_prices(
+                            security,
+                            lookback_days=lookback,
+                        )
+                        written = await security_prices.upsert_many(fetched)
+                        processed += written
+                        await session.commit()
+                        await item_logs.log_finish(
+                            log.id or 0, status="success", row_count=written
+                        )
+                    except Exception as exc:  # noqa: BLE001 - partial collection should continue.
+                        await session.rollback()
+                        errors.append(f"{security.ticker} underlying: {exc}")
+                        await item_logs.log_finish(
+                            log.id or 0, status="failed", error=str(exc)
+                        )
+
+                    if settings.underlying_price_throttle_seconds:
+                        await asyncio.sleep(settings.underlying_price_throttle_seconds)
+
+            if collect_holdings or collect_underlying_prices:
+                try:
+                    written_signals = await signal_service.recompute_daily()
+                    processed += written_signals
+                    written_outcomes = await evaluation_service.recompute(
+                        benchmark_ticker=settings.benchmark_ticker
+                    )
+                    processed += written_outcomes
+                    await session.commit()
+                except Exception as exc:  # noqa: BLE001 - partial collection should continue.
+                    await session.rollback()
+                    errors.append(f"analysis: {exc}")
+
             status = "partial" if errors and processed else "failed" if errors else "success"
             error = "\n".join(errors) if errors else None
             await runs.finish(run.id or 0, status=status, items_processed=processed, error=error)
@@ -239,6 +331,7 @@ def main() -> None:
     parser.add_argument("--lookback-days", type=int, default=365)
     parser.add_argument("--seed-only", action="store_true")
     parser.add_argument("--with-prices", action="store_true")
+    parser.add_argument("--with-underlying-prices", action="store_true")
     parser.add_argument("--skip-holdings", action="store_true")
     args = parser.parse_args()
 
@@ -247,6 +340,7 @@ def main() -> None:
             job_name="manual_collect",
             lookback_days=args.lookback_days,
             collect_prices=args.with_prices and not args.seed_only,
+            collect_underlying_prices=args.with_underlying_prices and not args.seed_only,
             collect_holdings=not args.seed_only and not args.skip_holdings,
             collect_profiles=not args.seed_only,
         )

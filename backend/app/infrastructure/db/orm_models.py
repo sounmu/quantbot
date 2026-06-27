@@ -81,6 +81,123 @@ class EtfPriceORM(Base):
     etf: Mapped[EtfORM] = relationship(back_populates="prices")
 
 
+class SecurityORM(Base):
+    __tablename__ = "security"
+
+    security_key: Mapped[str] = mapped_column(String(320), primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(32), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    first_seen: Mapped[date] = mapped_column(Date)
+    is_priceable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    prices: Mapped[list[SecurityPriceORM]] = relationship(
+        back_populates="security", cascade="all, delete-orphan"
+    )
+    signals: Mapped[list[SignalDailyORM]] = relationship(
+        back_populates="security", cascade="all, delete-orphan"
+    )
+    outcomes: Mapped[list[SignalOutcomeORM]] = relationship(
+        back_populates="security",
+        foreign_keys="SignalOutcomeORM.security_key",
+        cascade="all, delete-orphan",
+    )
+
+
+class SecurityPriceORM(Base):
+    __tablename__ = "security_price"
+    __table_args__ = (
+        UniqueConstraint("security_key", "date", name="uq_security_price_security_date"),
+        Index("ix_security_price_security_date", "security_key", "date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    security_key: Mapped[str] = mapped_column(
+        ForeignKey("security.security_key", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    close: Mapped[float] = mapped_column(Float)
+    adj_close: Mapped[float] = mapped_column(Float)
+    volume: Mapped[int | None] = mapped_column(BigInteger)
+
+    security: Mapped[SecurityORM] = relationship(back_populates="prices")
+
+
+class SignalDailyORM(Base):
+    __tablename__ = "signal_daily"
+    __table_args__ = (
+        UniqueConstraint("security_key", "as_of_date", name="uq_signal_daily_security_date"),
+        Index("ix_signal_daily_date_score", "as_of_date", "conviction_score"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    security_key: Mapped[str] = mapped_column(
+        ForeignKey("security.security_key", ondelete="CASCADE"), index=True
+    )
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    n_buying: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    n_selling: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    net_shares_flow: Mapped[float | None] = mapped_column(Float)
+    net_dollar_flow: Mapped[float | None] = mapped_column(Float)
+    conviction_score: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    security: Mapped[SecurityORM] = relationship(back_populates="signals")
+
+
+class SignalOutcomeORM(Base):
+    __tablename__ = "signal_outcome"
+    __table_args__ = (
+        UniqueConstraint(
+            "security_key",
+            "as_of_date",
+            "horizon_days",
+            "benchmark_key",
+            name="uq_signal_outcome_signal_horizon_benchmark",
+        ),
+        Index("ix_signal_outcome_horizon", "horizon_days"),
+        Index("ix_signal_outcome_security_date", "security_key", "as_of_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    security_key: Mapped[str] = mapped_column(
+        ForeignKey("security.security_key", ondelete="CASCADE"), index=True
+    )
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    horizon_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    benchmark_key: Mapped[str] = mapped_column(
+        ForeignKey("security.security_key", ondelete="CASCADE"), index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    stock_return: Mapped[float] = mapped_column(Float, nullable=False)
+    benchmark_return: Mapped[float] = mapped_column(Float, nullable=False)
+    excess_return: Mapped[float] = mapped_column(Float, nullable=False)
+    signal_score: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    security: Mapped[SecurityORM] = relationship(
+        foreign_keys=[security_key],
+        back_populates="outcomes",
+    )
+    benchmark: Mapped[SecurityORM] = relationship(foreign_keys=[benchmark_key])
+
+
 class EtfHoldingORM(Base):
     __tablename__ = "etf_holding"
     __table_args__ = (

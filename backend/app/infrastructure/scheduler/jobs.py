@@ -30,6 +30,7 @@ def create_scheduler(settings: Settings) -> AsyncIOScheduler:
             "job_name": "scheduled_collect",
             "lookback_days": settings.scheduler_lookback_days,
             "collect_prices": settings.scheduler_collect_prices,
+            "collect_underlying_prices": settings.scheduler_collect_underlying_prices,
             "collect_holdings": True,
         },
     )
@@ -57,6 +58,7 @@ async def catch_up_stale_holdings(settings: Settings) -> bool:
             job_name="startup_catch_up_collect",
             lookback_days=settings.scheduler_lookback_days,
             collect_prices=settings.scheduler_collect_prices,
+            collect_underlying_prices=settings.scheduler_collect_underlying_prices,
             collect_holdings=True,
         )
     except CollectionAlreadyRunningError:

@@ -43,6 +43,63 @@ class PricePoint:
 
 
 @dataclass(slots=True)
+class Security:
+    security_key: str
+    ticker: str
+    name: str
+    first_seen: date
+    is_priceable: bool = True
+
+
+@dataclass(slots=True)
+class SecurityPrice:
+    security_key: str
+    on: date
+    close: float
+    adj_close: float
+    volume: int | None = None
+
+
+@dataclass(slots=True)
+class SignalDaily:
+    security_key: str
+    as_of_date: date
+    security_ticker: str
+    security_name: str
+    n_buying: int
+    n_selling: int
+    net_shares_flow: float | None
+    net_dollar_flow: float | None
+    conviction_score: float
+
+
+@dataclass(slots=True)
+class SignalParticipant:
+    etf_ticker: str
+    etf_name: str
+    issuer: str
+    direction: str
+    change_type: str
+    shares_delta: float | None
+    shares_delta_pct: float | None
+    weight_delta: float | None
+
+
+@dataclass(slots=True)
+class SignalOutcome:
+    security_key: str
+    as_of_date: date
+    horizon_days: int
+    benchmark_key: str
+    start_date: date
+    end_date: date
+    stock_return: float
+    benchmark_return: float
+    excess_return: float
+    signal_score: float
+
+
+@dataclass(slots=True)
 class Holding:
     ticker: str
     as_of_date: date

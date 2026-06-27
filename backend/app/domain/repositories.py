@@ -4,7 +4,19 @@ from typing import Protocol
 
 from datetime import date
 
-from app.domain.entities import CollectionRun, Etf, Holding, HoldingChange, Metric, PricePoint
+from app.domain.entities import (
+    CollectionRun,
+    Etf,
+    Holding,
+    HoldingChange,
+    Metric,
+    PricePoint,
+    Security,
+    SecurityPrice,
+    SignalDaily,
+    SignalOutcome,
+    SignalParticipant,
+)
 
 
 class EtfRepository(Protocol):
@@ -33,6 +45,57 @@ class PriceRepository(Protocol):
     async def upsert_many(self, prices: list[PricePoint]) -> int: ...
 
     async def series(self, ticker: str, *, range_: str = "1y") -> list[PricePoint]: ...
+
+
+class SecurityRepository(Protocol):
+    async def upsert_many(self, securities: list[Security]) -> int: ...
+
+    async def get(self, security_key: str) -> Security | None: ...
+
+    async def list_priceable(self) -> list[Security]: ...
+
+
+class SecurityPriceRepository(Protocol):
+    async def upsert_many(self, prices: list[SecurityPrice]) -> int: ...
+
+    async def series(self, security_key: str) -> list[SecurityPrice]: ...
+
+    async def latest_date(self, security_key: str) -> date | None: ...
+
+    async def latest_adj_close_by_security(
+        self,
+        security_keys: list[str],
+        *,
+        on_or_before: date,
+    ) -> dict[str, float]: ...
+
+
+class SignalDailyRepository(Protocol):
+    async def replace_for_dates(self, dates: list[date], signals: list[SignalDaily]) -> int: ...
+
+    async def latest_date(self) -> date | None: ...
+
+    async def daily(
+        self,
+        *,
+        as_of_date: date | None = None,
+        limit: int = 100,
+    ) -> list[SignalDaily]: ...
+
+    async def for_security(self, security_key: str, *, limit: int = 100) -> list[SignalDaily]: ...
+
+    async def buy_signals(self) -> list[SignalDaily]: ...
+
+
+class SignalOutcomeRepository(Protocol):
+    async def replace_all(self, outcomes: list[SignalOutcome]) -> int: ...
+
+    async def list(
+        self,
+        *,
+        horizon_days: int | None = None,
+        security_key: str | None = None,
+    ) -> list[SignalOutcome]: ...
 
 
 class HoldingRepository(Protocol):
@@ -70,6 +133,15 @@ class HoldingChangeRepository(Protocol):
         limit: int = 100,
         change_types: list[str] | None = None,
     ) -> list[HoldingChange]: ...
+
+    async def signal_sources(self, *, as_of_date: date | None = None) -> list[HoldingChange]: ...
+
+    async def signal_participants(
+        self,
+        security_key: str,
+        *,
+        as_of_date: date | None = None,
+    ) -> list[SignalParticipant]: ...
 
 
 class MetricRepository(Protocol):

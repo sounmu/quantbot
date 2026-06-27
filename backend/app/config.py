@@ -18,10 +18,14 @@ class Settings(BaseSettings):
     collect_cron_hour: int = Field(default=22, ge=0, le=23)
     collect_cron_minute: int = Field(default=0, ge=0, le=59)
     scheduler_collect_prices: bool = False
+    scheduler_collect_underlying_prices: bool = False
     scheduler_lookback_days: int = Field(default=365, ge=1)
     scheduler_catch_up_on_startup: bool = True
     scheduler_stale_after_days: int = Field(default=1, ge=0)
     holdings_http_timeout: float = Field(default=30.0, gt=0)
+    benchmark_ticker: str = "QQQ"
+    underlying_price_overlap_days: int = Field(default=7, ge=0)
+    underlying_price_throttle_seconds: float = Field(default=0.0, ge=0)
     signal_min_aum: float = Field(default=100_000_000, ge=0)
     signal_exchanges: str = (
         "NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,"

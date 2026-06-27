@@ -7,12 +7,21 @@ def normalize_ticker(ticker: str) -> str:
     return ticker.strip().upper()
 
 
+def normalize_security_key(security_key: str) -> str:
+    return security_key.strip().upper()
+
+
 class ChangeType:
     NEW = "NEW"
     EXIT = "EXIT"
     INCREASE = "INCREASE"
     DECREASE = "DECREASE"
     UNCHANGED = "UNCHANGED"
+
+
+class SignalDirection:
+    BUY = "BUY"
+    SELL = "SELL"
 
 
 _CASH_TOKENS = {"", "--", "-", "CASH", "USD", "US DOLLAR", "DOLLAR", "MONEYMARKET"}

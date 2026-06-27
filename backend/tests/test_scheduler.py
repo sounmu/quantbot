@@ -10,6 +10,7 @@ def test_create_scheduler_registers_daily_collect_job() -> None:
             collect_cron_hour=23,
             collect_cron_minute=15,
             scheduler_collect_prices=True,
+            scheduler_collect_underlying_prices=True,
             scheduler_lookback_days=42,
         )
     )
@@ -23,6 +24,7 @@ def test_create_scheduler_registers_daily_collect_job() -> None:
         "job_name": "scheduled_collect",
         "lookback_days": 42,
         "collect_prices": True,
+        "collect_underlying_prices": True,
         "collect_holdings": True,
     }
     assert job.coalesce is True

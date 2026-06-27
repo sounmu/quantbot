@@ -5,8 +5,14 @@ import type {
   EtfQuery,
   HoldingChange,
   Holding,
+  HorizonDays,
+  PerformanceBucket,
+  PerformanceSummary,
   PositionHistoryPoint,
-  PricePoint
+  PricePoint,
+  SecurityAnalysisPoint,
+  SignalDaily,
+  SignalSecurityHistory
 } from "./types";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(
@@ -78,5 +84,27 @@ export function fetchThemes() {
 export function fetchCompare(tickers: string[], range: string) {
   return fetchJson<CompareResponse>(
     `/api/etfs/compare${toSearchParams({ tickers: tickers.join(","), range })}`
+  );
+}
+
+export function fetchDailySignals(limit = 100, date?: string) {
+  return fetchJson<SignalDaily[]>(`/api/signals/daily${toSearchParams({ limit, date })}`);
+}
+
+export function fetchSignalSecurityHistory(securityKey: string, limit = 100) {
+  return fetchJson<SignalSecurityHistory[]>(
+    `/api/signals/security/${encodeURIComponent(securityKey)}${toSearchParams({ limit })}`
+  );
+}
+
+export function fetchAnalysisPerformance(horizon?: HorizonDays, bucket?: PerformanceBucket) {
+  return fetchJson<PerformanceSummary[]>(
+    `/api/analysis/performance${toSearchParams({ horizon, bucket })}`
+  );
+}
+
+export function fetchSecurityAnalysis(securityKey: string) {
+  return fetchJson<SecurityAnalysisPoint[]>(
+    `/api/analysis/security/${encodeURIComponent(securityKey)}`
   );
 }
