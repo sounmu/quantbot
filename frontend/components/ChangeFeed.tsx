@@ -13,6 +13,8 @@ type Props = {
   errorMessage?: string;
   initialVisibleCount?: number;
   visibleStep?: number;
+  // 좁은 사이드 컬럼용: 데스크탑에서도 테이블 대신 타임라인 카드만 사용한다.
+  dense?: boolean;
 };
 
 export function ChangeFeed({
@@ -21,7 +23,8 @@ export function ChangeFeed({
   isLoading,
   errorMessage,
   initialVisibleCount,
-  visibleStep = initialVisibleCount ?? 10
+  visibleStep = initialVisibleCount ?? 10,
+  dense = false
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(initialVisibleCount ?? changes.length);
   const visibleChanges = useMemo(
@@ -44,7 +47,8 @@ export function ChangeFeed({
         <StatusCard>변동 데이터 없음</StatusCard>
       ) : (
         <>
-          <ol className="relative space-y-3 border-l border-line pl-4">
+          {/* 모바일(+dense 사이드 컬럼): 타임라인 카드 */}
+          <ol className={`relative space-y-3 border-l border-line pl-4 ${dense ? "" : "lg:hidden"}`}>
             {visibleChanges.map((change) => (
               <li
                 key={`${change.ticker}-${change.as_of_date}-${change.holding_ticker}-${change.holding_name}`}
@@ -89,6 +93,59 @@ export function ChangeFeed({
               </li>
             ))}
           </ol>
+
+          {/* 데스크탑: 테이블 (dense 모드에서는 렌더하지 않음) */}
+          {!dense && (
+          <div className="hidden overflow-hidden rounded-lg border border-line bg-surface lg:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-xs font-semibold text-faint">
+                  {showEtf ? <th className="px-3 py-2.5 pl-4">ETF</th> : null}
+                  <th className={`px-3 py-2.5 ${showEtf ? "" : "pl-4"}`}>종목</th>
+                  <th className="px-3 py-2.5">이름</th>
+                  <th className="px-3 py-2.5">변동</th>
+                  <th className="px-3 py-2.5 text-right">주식수 Δ</th>
+                  <th className="px-3 py-2.5 text-right">비중 Δ</th>
+                  <th className="px-3 py-2.5 pr-4 text-right">날짜</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleChanges.map((change) => (
+                  <tr
+                    key={`${change.ticker}-${change.as_of_date}-${change.holding_ticker}-${change.holding_name}`}
+                    className="border-b border-hair last:border-0 transition hover:bg-panel"
+                  >
+                    {showEtf ? (
+                      <td className="py-3 pl-4">
+                        <Link className="font-semibold text-cobalt hover:text-brand" href={`/etfs/${change.ticker}`}>
+                          {change.ticker}
+                        </Link>
+                      </td>
+                    ) : null}
+                    <td className={`py-3 font-bold tracking-tight text-ink ${showEtf ? "pr-3" : "pl-4 pr-3"}`}>
+                      {change.holding_ticker ?? "N/A"}
+                    </td>
+                    <td className="max-w-[280px] truncate py-3 pr-3 text-muted" title={change.holding_name}>
+                      {change.holding_name}
+                    </td>
+                    <td className="py-3 pr-3">
+                      <ChangeBadge type={change.change_type} />
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      <DeltaValue value={change.shares_delta} suffix="" />
+                    </td>
+                    <td className="py-3 pr-3 text-right tabular-nums">
+                      <DeltaValue value={change.weight_delta} suffix="%" />
+                    </td>
+                    <td className="py-3 pr-4 text-right text-xs tabular-nums text-faint">
+                      <time dateTime={change.as_of_date}>{change.as_of_date}</time>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
 
           {remainingCount > 0 ? (
             <button

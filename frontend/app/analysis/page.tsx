@@ -45,7 +45,11 @@ export default function AnalysisPage() {
             {buySignals.length === 0 ? (
               <StatusCard>shares 증가 신호 없음</StatusCard>
             ) : (
-              buySignals.map((signal) => <SignalCard key={signalKey(signal)} signal={signal} />)
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {buySignals.map((signal) => (
+                  <SignalCard key={signalKey(signal)} signal={signal} />
+                ))}
+              </div>
             )}
           </section>
         </div>

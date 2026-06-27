@@ -61,8 +61,9 @@ test.describe("Changes page", () => {
     await page.goto("/changes");
 
     await expect(page.locator("h1")).toContainText("최근 매매 피드");
-    await expect(page.getByText("NVDA")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("TSLA")).toBeVisible();
+    // 모바일 카드는 종목 티커를 heading으로 노출(데스크탑 테이블 셀은 hidden이라 role 쿼리에서 제외)
+    await expect(page.getByRole("heading", { name: "NVDA" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "TSLA" })).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 

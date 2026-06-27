@@ -164,64 +164,130 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
         {shown.length === 0 ? (
           <StatusCard>조건에 맞는 종목이 없습니다</StatusCard>
         ) : (
-          <div className="space-y-3" role="list">
-            {shown.map((holding) => {
-              const key = positionKey(holding);
-              const label = holding.holding_ticker ?? holding.holding_name;
-              const isSelected = selectedKey === key;
-              return (
-                <div
-                  key={`${holding.as_of_date}-${holding.holding_key}-${holding.holding_name}`}
-                  role="listitem"
-                >
-                  <button
-                    className={`w-full rounded-lg border bg-surface p-4 text-left transition ${
-                      isSelected
-                        ? "border-brand ring-2 ring-brand/15"
-                        : "border-line hover:border-line-strong"
-                    }`}
-                    type="button"
-                    aria-label={`${label} 포지션 선택`}
-                    aria-pressed={isSelected}
-                    onClick={() => onSelect?.(key, label)}
+          <>
+            {/* 모바일: 카드 리스트 */}
+            <div className="space-y-3 lg:hidden" role="list">
+              {shown.map((holding) => {
+                const key = positionKey(holding);
+                const label = holding.holding_ticker ?? holding.holding_name;
+                const isSelected = selectedKey === key;
+                return (
+                  <div
+                    key={`${holding.as_of_date}-${holding.holding_key}-${holding.holding_name}`}
+                    role="listitem"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-lg font-bold leading-none tracking-tight text-ink">
-                            {holding.holding_ticker ?? "N/A"}
-                          </span>
-                          <ChangeBadge type={holding.change_type} compact />
+                    <button
+                      className={`w-full rounded-lg border bg-surface p-4 text-left transition ${
+                        isSelected
+                          ? "border-brand ring-2 ring-brand/15"
+                          : "border-line hover:border-line-strong"
+                      }`}
+                      type="button"
+                      aria-label={`${label} 포지션 선택`}
+                      aria-pressed={isSelected}
+                      onClick={() => onSelect?.(key, label)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-lg font-bold leading-none tracking-tight text-ink">
+                              {holding.holding_ticker ?? "N/A"}
+                            </span>
+                            <ChangeBadge type={holding.change_type} compact />
+                          </div>
+                          <p className="mt-2 break-words text-sm leading-snug text-muted">
+                            {holding.holding_name}
+                          </p>
                         </div>
-                        <p className="mt-2 break-words text-sm leading-snug text-muted">
-                          {holding.holding_name}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-[11px] text-faint">비중</div>
-                        <div className="mt-1 text-sm font-semibold tabular-nums text-ink">
-                          {holding.weight.toFixed(2)}%
+                        <div className="shrink-0 text-right">
+                          <div className="text-[11px] text-faint">비중</div>
+                          <div className="mt-1 text-sm font-semibold tabular-nums text-ink">
+                            {holding.weight.toFixed(2)}%
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-hair pt-3 text-xs">
-                      <Metric label="주식수" value={formatNumber(holding.shares)} />
-                      <Metric
-                        label="주식수 Δ"
-                        value={<DeltaValue value={holding.shares_delta} suffix="" />}
-                      />
-                      <Metric
-                        label="비중 Δ"
-                        value={<DeltaValue value={holding.weight_delta} suffix="%" />}
-                      />
-                      <Metric label="시장가치" value={formatMoney(holding.market_value)} />
-                    </div>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-hair pt-3 text-xs">
+                        <Metric label="주식수" value={formatNumber(holding.shares)} />
+                        <Metric
+                          label="주식수 Δ"
+                          value={<DeltaValue value={holding.shares_delta} suffix="" />}
+                        />
+                        <Metric
+                          label="비중 Δ"
+                          value={<DeltaValue value={holding.weight_delta} suffix="%" />}
+                        />
+                        <Metric label="시장가치" value={formatMoney(holding.market_value)} />
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 데스크탑: 테이블 */}
+            <div className="hidden overflow-hidden rounded-lg border border-line bg-surface lg:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-xs font-semibold text-faint">
+                    <th className="px-3 py-2.5 pl-4">종목</th>
+                    <th className="px-3 py-2.5">이름</th>
+                    <th className="px-3 py-2.5">변동</th>
+                    <th className="px-3 py-2.5 text-right">비중</th>
+                    <th className="px-3 py-2.5 text-right">주식수</th>
+                    <th className="px-3 py-2.5 text-right">주식수 Δ</th>
+                    <th className="px-3 py-2.5 text-right">비중 Δ</th>
+                    <th className="px-3 py-2.5 pr-4 text-right">시장가치</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((holding) => {
+                    const key = positionKey(holding);
+                    const label = holding.holding_ticker ?? holding.holding_name;
+                    const isSelected = selectedKey === key;
+                    return (
+                      <tr
+                        key={`${holding.as_of_date}-${holding.holding_key}-${holding.holding_name}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        aria-label={`${label} 포지션 선택`}
+                        onClick={() => onSelect?.(key, label)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onSelect?.(key, label);
+                          }
+                        }}
+                        className={`cursor-pointer border-b border-hair last:border-0 transition ${
+                          isSelected ? "bg-brand-soft" : "hover:bg-panel"
+                        }`}
+                      >
+                        <td className="py-3 pl-4 font-bold tracking-tight text-ink">
+                          {holding.holding_ticker ?? "N/A"}
+                        </td>
+                        <td className="max-w-[260px] truncate py-3 pr-3 text-muted" title={holding.holding_name}>
+                          {holding.holding_name}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <ChangeBadge type={holding.change_type} compact />
+                        </td>
+                        <td className="py-3 pr-3 text-right tabular-nums text-ink">{holding.weight.toFixed(2)}%</td>
+                        <td className="py-3 pr-3 text-right tabular-nums text-body">{formatNumber(holding.shares)}</td>
+                        <td className="py-3 pr-3 text-right tabular-nums">
+                          <DeltaValue value={holding.shares_delta} suffix="" />
+                        </td>
+                        <td className="py-3 pr-3 text-right tabular-nums">
+                          <DeltaValue value={holding.weight_delta} suffix="%" />
+                        </td>
+                        <td className="py-3 pr-4 text-right tabular-nums text-body">{formatMoney(holding.market_value)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {remaining > 0 ? (

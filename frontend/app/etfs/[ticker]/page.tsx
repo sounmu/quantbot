@@ -88,7 +88,7 @@ export default function EtfDetailPage() {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
           <Stat label="운용사" value={detail.data?.issuer ?? "-"} />
           <Stat label="테마" value={detail.data?.theme ?? "-"} />
           <Stat label="보수율" value={formatPercent(detail.data?.expense_ratio ?? null)} />
@@ -96,78 +96,85 @@ export default function EtfDetailPage() {
         </div>
       </section>
 
-      <div className="mb-3 space-y-3">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-ink">보유 종목 스냅샷</h2>
-          <p className="mt-1 text-sm text-muted">
-            주식수 Δ 기준으로 실제 매매 방향을 판정하고, 비중 Δ는 보조 지표로 표시합니다.
-          </p>
-        </div>
-        <select
-          className="h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm tabular-nums text-body"
-          value={snapshotDate ?? ""}
-          onChange={(event) => {
-            setSnapshotDate(event.target.value || undefined);
-            setSelectedPosition(null);
-            setSelectedPositionLabel(null);
-          }}
-        >
-          {(holdingDates.data ?? []).map((date) => (
-            <option key={date} value={date}>
-              {date}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="space-y-4">
-        <PositionHistoryChart
-          points={positionHistory.data ?? []}
-          label={selectedPositionLabel}
-          isLoading={positionHistory.isLoading}
-        />
-        <HoldingsTable
-          holdings={holdings.data ?? []}
-          isLoading={holdings.isLoading}
-          errorMessage={holdings.isError ? "보유종목 데이터를 불러오지 못했습니다." : undefined}
-          selectedKey={selectedPosition}
-          onSelect={(key, label) => {
-            setSelectedPosition(key);
-            setSelectedPositionLabel(label);
-          }}
-        />
-      </div>
-
-      <div className="mt-6">
-        <h2 className="mb-3 text-lg font-bold tracking-tight text-ink">스냅샷 변동 피드</h2>
-        <ChangeFeed
-          changes={holdingChanges.data ?? []}
-          isLoading={holdingChanges.isLoading}
-          errorMessage={holdingChanges.isError ? "스냅샷 변동 데이터를 불러오지 못했습니다." : undefined}
-          initialVisibleCount={5}
-          visibleStep={5}
-        />
-      </div>
-
-      <div className="mb-3 mt-6 space-y-3">
-        <h2 className="text-lg font-bold tracking-tight text-ink">가격 컨텍스트</h2>
-        <div className="flex gap-1 rounded-lg bg-panel p-1">
-          {RANGES.map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={range === item}
-              className={`h-10 flex-1 rounded-md text-xs font-semibold transition ${
-                range === item ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-body"
-              }`}
-              onClick={() => setRange(item)}
+      <div className="grid gap-6 xl:grid-cols-3 xl:items-start">
+        {/* 좌측: 보유 종목 스냅샷 */}
+        <div className="space-y-4 xl:col-span-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-ink">보유 종목 스냅샷</h2>
+              <p className="mt-1 text-sm text-muted">
+                주식수 Δ 기준으로 실제 매매 방향을 판정하고, 비중 Δ는 보조 지표로 표시합니다.
+              </p>
+            </div>
+            <select
+              className="h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm tabular-nums text-body sm:w-auto"
+              value={snapshotDate ?? ""}
+              onChange={(event) => {
+                setSnapshotDate(event.target.value || undefined);
+                setSelectedPosition(null);
+                setSelectedPositionLabel(null);
+              }}
             >
-              {item.toUpperCase()}
-            </button>
-          ))}
+              {(holdingDates.data ?? []).map((date) => (
+                <option key={date} value={date}>
+                  {date}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <PositionHistoryChart
+            points={positionHistory.data ?? []}
+            label={selectedPositionLabel}
+            isLoading={positionHistory.isLoading}
+          />
+          <HoldingsTable
+            holdings={holdings.data ?? []}
+            isLoading={holdings.isLoading}
+            errorMessage={holdings.isError ? "보유종목 데이터를 불러오지 못했습니다." : undefined}
+            selectedKey={selectedPosition}
+            onSelect={(key, label) => {
+              setSelectedPosition(key);
+              setSelectedPositionLabel(label);
+            }}
+          />
+        </div>
+
+        {/* 우측: 가격 컨텍스트 + 스냅샷 변동 피드 */}
+        <div className="space-y-6 xl:col-span-1">
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold tracking-tight text-ink">가격 컨텍스트</h2>
+            <div className="flex gap-1 rounded-lg bg-panel p-1">
+              {RANGES.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={range === item}
+                  className={`h-10 flex-1 rounded-md text-xs font-semibold transition ${
+                    range === item ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-body"
+                  }`}
+                  onClick={() => setRange(item)}
+                >
+                  {item.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <PriceChart prices={prices.data ?? []} />
+          </div>
+
+          <div>
+            <h2 className="mb-3 text-lg font-bold tracking-tight text-ink">스냅샷 변동 피드</h2>
+            <ChangeFeed
+              changes={holdingChanges.data ?? []}
+              isLoading={holdingChanges.isLoading}
+              errorMessage={holdingChanges.isError ? "스냅샷 변동 데이터를 불러오지 못했습니다." : undefined}
+              initialVisibleCount={5}
+              visibleStep={5}
+              dense
+            />
+          </div>
         </div>
       </div>
-      <PriceChart prices={prices.data ?? []} />
 
       <p className="mt-6 text-xs text-muted">
         본 화면은 발행사 공시 holdings를 재가공한 정보이며 투자자문이 아닙니다.

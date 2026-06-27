@@ -15,9 +15,10 @@
 - Capital Group 공식 일별 XLSX 어댑터: CGGR, CGDV
 - T. Rowe Price 상품 페이지 embedded JSON 어댑터: TCAF
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
+- yfinance profile 기반 ETF 거래소/AUM 메타 보강과 분석 유니버스 게이팅
 - APScheduler 기반 일일 자동 수집과 admin 수동 수집 API
 - ETF별 holdings 날짜, 스냅샷, 변동, 종목 이력, 전체 최근 매매 피드 API
-- Next.js App Router 프론트: 모바일 고정폭 PWA 셸, 하단 탭, ETF/holdings/최근 매매 카드, shares 증가 분석 보드, 가격/비교 차트, 라이트/다크 모드 토글
+- Next.js App Router 프론트: PC 중심 반응형 셸(데스크탑 좌측 사이드바·와이드 콘텐츠, 모바일 하단 탭), ETF/holdings/최근 매매 데이터 테이블(모바일은 카드), shares 증가 분석 보드, 가격/비교 차트, 라이트/다크 모드 토글
 
 ## 아키텍처 규칙
 
@@ -71,6 +72,11 @@ curl http://localhost:8000/api/changes/recent
 uv run python -m app.application.pipeline.collect --with-prices --lookback-days 365
 ```
 
+수집은 seed upsert 후 yfinance `Ticker.info`의 `fullExchangeName`/`exchange`,
+`totalAssets`로 ETF profile을 보강하고, `SIGNAL_MIN_AUM`과
+`SIGNAL_EXCHANGES` 기준으로 `in_signal_universe`를 재계산합니다. yfinance profile은
+공식 발행사 데이터가 아니므로 seed JSON의 `exchange`/`aum` 필드로 수동 보정할 수 있습니다.
+
 첫 수집에는 이전 스냅샷이 없으므로 대부분 `NEW`로 표시됩니다. 두 번째 영업일 스냅샷부터 `INCREASE`, `DECREASE`, `EXIT` 변동이 의미 있게 쌓입니다.
 
 스케줄러를 로컬에서 켜려면 `.env`에 다음을 설정합니다.
@@ -79,6 +85,8 @@ uv run python -m app.application.pipeline.collect --with-prices --lookback-days 
 SCHEDULER_ENABLED=true
 COLLECT_CRON_HOUR=22
 COLLECT_CRON_MINUTE=0
+SIGNAL_MIN_AUM=100000000
+SIGNAL_EXCHANGES=NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,NYSE,NYQ,NYSEArca,PCX,CboeUS,CboeBZX,BATS,BTS,NYSEAmerican,ASE
 ```
 
 수동 수집과 수집 로그 확인:
@@ -116,8 +124,8 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 ## 주요 API
 
 - `GET /health`
-- `GET /api/etfs`
-- `GET /api/etfs/{ticker}`
+- `GET /api/etfs` — `exchange`, `aum`, `in_signal_universe` 포함
+- `GET /api/etfs/{ticker}` — `exchange`, `aum`, `in_signal_universe` 포함
 - `GET /api/etfs/{ticker}/holdings?date=YYYY-MM-DD`
 - `GET /api/etfs/{ticker}/holdings/dates`
 - `GET /api/etfs/{ticker}/changes?date=YYYY-MM-DD`
@@ -129,8 +137,14 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 - `GET /api/meta/themes`
 - `POST /api/admin/collect` with `x-admin-token`
 - `GET /api/admin/runs` with `x-admin-token`
+- `GET /api/admin/dashboard/quality` with `x-admin-token` — stale/missing shares와
+  거래소/AUM/분석 유니버스 게이팅 상태
 
 ## 데이터 소스
+
+ETF 가격과 profile 메타(`exchange`, `aum`)는 yfinance를 1차 소스로 사용합니다.
+profile 메타는 발행사 공식 holdings가 아니므로, 필요하면 seed JSON의 `exchange`/`aum`
+override로 보정합니다.
 
 현재 기본 registry에 등록된 공식 holdings 소스입니다.
 

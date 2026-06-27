@@ -12,8 +12,8 @@ type Props = {
 
 export function FilterBar({ query, issuers, themes, onChange }: Props) {
   return (
-    <div className="grid gap-2 rounded-lg border border-line bg-surface p-3">
-      <label className="relative block">
+    <div className="grid gap-2 rounded-lg border border-line bg-surface p-3 sm:grid-cols-2 lg:flex lg:items-center">
+      <label className="relative block sm:col-span-2 lg:min-w-0 lg:flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
         <input
           className="h-11 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-brand/50"
@@ -23,7 +23,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         />
       </label>
       <select
-        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body lg:w-auto"
         value={query.issuer ?? ""}
         onChange={(event) => onChange({ ...query, issuer: event.target.value, page: 1 })}
       >
@@ -35,7 +35,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         ))}
       </select>
       <select
-        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body lg:w-auto"
         value={query.theme ?? ""}
         onChange={(event) => onChange({ ...query, theme: event.target.value, page: 1 })}
       >
@@ -47,7 +47,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         ))}
       </select>
       <select
-        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body lg:w-auto"
         value={query.sort ?? "name"}
         onChange={(event) =>
           onChange({ ...query, sort: event.target.value as EtfQuery["sort"], page: 1 })
@@ -59,7 +59,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         <option value="return_1y">1Y 수익률</option>
       </select>
       <select
-        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body lg:w-auto"
         value={query.order ?? "asc"}
         onChange={(event) =>
           onChange({ ...query, order: event.target.value as EtfQuery["order"], page: 1 })
