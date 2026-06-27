@@ -11,11 +11,23 @@ class Etf:
     issuer: str
     theme: str | None = None
     expense_ratio: float | None = None
+    exchange: str | None = None
+    aum: float | None = None
+    in_signal_universe: bool = False
+    signal_universe_reason: str | None = None
     inception_date: date | None = None
     is_active_etf: bool = True
     discloses_daily: bool = True
     currency: str = "USD"
     description: str | None = None
+
+
+@dataclass(slots=True)
+class EtfProfile:
+    ticker: str
+    as_of: date
+    exchange: str | None = None
+    aum: float | None = None
 
 
 @dataclass(slots=True)

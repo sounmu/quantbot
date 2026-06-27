@@ -198,12 +198,22 @@ def _to_list_item(item: EtfWithMetric) -> EtfListItem:
         issuer=item.etf.issuer,
         theme=item.etf.theme,
         expense_ratio=item.etf.expense_ratio,
+        exchange=item.etf.exchange,
+        aum=_item_aum(item),
+        in_signal_universe=item.etf.in_signal_universe,
+        signal_universe_reason=item.etf.signal_universe_reason,
         discloses_daily=item.etf.discloses_daily,
         return_1m=item.metric.return_1m if item.metric else None,
         return_3m=item.metric.return_3m if item.metric else None,
         return_ytd=item.metric.return_ytd if item.metric else None,
         return_1y=item.metric.return_1y if item.metric else None,
     )
+
+
+def _item_aum(item: EtfWithMetric) -> float | None:
+    if item.etf.aum is not None:
+        return item.etf.aum
+    return item.metric.aum if item.metric else None
 
 
 def _to_detail_item(item: EtfWithMetric) -> EtfDetailResponse:
@@ -214,7 +224,6 @@ def _to_detail_item(item: EtfWithMetric) -> EtfDetailResponse:
         currency=item.etf.currency,
         description=item.etf.description,
         as_of=item.metric.as_of if item.metric else None,
-        aum=item.metric.aum if item.metric else None,
     )
 
 
@@ -223,7 +232,6 @@ def _to_compare_item(item: EtfWithMetric) -> CompareItem:
     return CompareItem(
         **list_item.model_dump(),
         as_of=item.metric.as_of if item.metric else None,
-        aum=item.metric.aum if item.metric else None,
     )
 
 

@@ -4,6 +4,10 @@ export type EtfListItem = {
   issuer: string;
   theme: string | null;
   expense_ratio: number | null;
+  exchange: string | null;
+  aum: number | null;
+  in_signal_universe: boolean;
+  signal_universe_reason: string | null;
   discloses_daily: boolean;
   return_1m: number | null;
   return_3m: number | null;
@@ -16,7 +20,6 @@ export type EtfDetail = EtfListItem & {
   currency: string;
   description: string | null;
   as_of: string | null;
-  aum: number | null;
 };
 
 export type EtfListResponse = {

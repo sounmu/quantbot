@@ -11,6 +11,10 @@ class EtfListItem(BaseModel):
     issuer: str
     theme: str | None = None
     expense_ratio: float | None = None
+    exchange: str | None = None
+    aum: float | None = None
+    in_signal_universe: bool = False
+    signal_universe_reason: str | None = None
     discloses_daily: bool = True
     return_1m: float | None = None
     return_3m: float | None = None
@@ -32,12 +36,10 @@ class EtfDetailResponse(EtfListItem):
     currency: str = "USD"
     description: str | None = None
     as_of: date | None = None
-    aum: float | None = None
 
 
 class CompareItem(EtfListItem):
     as_of: date | None = None
-    aum: float | None = None
 
 
 class CompareResponse(BaseModel):

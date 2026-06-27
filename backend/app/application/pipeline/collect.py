@@ -4,12 +4,16 @@ import argparse
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import replace
+from datetime import UTC, datetime
 
-from app.application.services.metric_service import MetricService
 from app.application.services.holding_change_service import HoldingChangeService
+from app.application.services.metric_service import MetricService
+from app.application.services.universe_service import SignalUniversePolicy, refresh_signal_universe
 from sqlalchemy import select
 
-from app.domain.entities import Etf, Holding
+from app.config import get_settings
+from app.domain.entities import Etf, EtfProfile, Holding, Metric
 from app.domain.value_objects import holding_key, normalize_ticker
 from app.infrastructure.db.engine import SessionLocal
 from app.infrastructure.db.orm_models import EtfORM
@@ -41,6 +45,7 @@ async def collect_once(
     lookback_days: int = 365,
     collect_prices: bool = False,
     collect_holdings: bool = True,
+    collect_profiles: bool = True,
     lock_already_acquired: bool = False,
 ) -> int:
     async with collection_lock(already_acquired=lock_already_acquired):
@@ -49,6 +54,7 @@ async def collect_once(
             lookback_days=lookback_days,
             collect_prices=collect_prices,
             collect_holdings=collect_holdings,
+            collect_profiles=collect_profiles,
         )
 
 
@@ -85,6 +91,7 @@ async def _collect_once_unlocked(
     lookback_days: int,
     collect_prices: bool,
     collect_holdings: bool,
+    collect_profiles: bool,
 ) -> int:
     async with SessionLocal() as session:
         etfs = SqlAlchemyEtfRepository(session)
@@ -98,17 +105,41 @@ async def _collect_once_unlocked(
         change_service = HoldingChangeService()
         price_provider = YFinanceMarketDataProvider()
         holdings_registry = HoldingsProviderRegistry()
+        settings = get_settings()
+        signal_policy = SignalUniversePolicy(
+            min_aum=settings.signal_min_aum,
+            exchanges=settings.signal_exchange_list,
+        )
 
         run = await runs.start(job_name)
         processed = 0
         errors: list[str] = []
 
         try:
-            seeded = await load_seed_universe(etfs)
+            seeded = await load_seed_universe(etfs, metrics=metrics)
             processed += seeded
             await session.commit()
 
             universe, _ = await etfs.list(page=1, page_size=1000)
+
+            if collect_profiles:
+                for etf in universe:
+                    try:
+                        profile = await price_provider.fetch_profile(etf.ticker)
+                        if profile is None:
+                            continue
+                        changed = await _apply_profile(etfs, metrics, etf, profile)
+                        processed += 1 if changed else 0
+                        await session.commit()
+                    except Exception as exc:  # noqa: BLE001 - partial collection should continue.
+                        await session.rollback()
+                        errors.append(f"{etf.ticker} profile: {exc}")
+
+            refreshed = await refresh_signal_universe(etfs, metrics, signal_policy)
+            processed += refreshed
+            await session.commit()
+            universe, _ = await etfs.list(page=1, page_size=1000)
+
             # Resolve etf_id for each ticker (for item log FK)
             etf_ids: dict[str, int] = {}
             for etf in universe:
@@ -171,7 +202,9 @@ async def _collect_once_unlocked(
                         written = await prices.upsert_many(fetched)
                         processed += written
                         series = await prices.series(etf.ticker, range_="1y")
-                        metric = metric_service.calculate(etf.ticker, series)
+                        existing_metric = await metrics.get(etf.ticker)
+                        existing_aum = existing_metric.aum if existing_metric else etf.aum
+                        metric = metric_service.calculate(etf.ticker, series, aum=existing_aum)
                         if metric is not None:
                             await metrics.upsert(metric)
                         await session.commit()
@@ -215,9 +248,42 @@ def main() -> None:
             lookback_days=args.lookback_days,
             collect_prices=args.with_prices and not args.seed_only,
             collect_holdings=not args.seed_only and not args.skip_holdings,
+            collect_profiles=not args.seed_only,
         )
     )
     print(f"processed={processed}")
+
+
+async def _apply_profile(
+    etfs: SqlAlchemyEtfRepository,
+    metrics: SqlAlchemyMetricRepository,
+    etf: Etf,
+    profile: EtfProfile,
+) -> bool:
+    existing_metric = await metrics.get(etf.ticker)
+    aum = profile.aum if profile.aum is not None else etf.aum
+    updated = replace(
+        etf,
+        exchange=profile.exchange or etf.exchange,
+        aum=aum,
+    )
+    changed = updated != etf
+    if changed:
+        await etfs.upsert(updated)
+    if profile.aum is not None:
+        await metrics.upsert(
+            Metric(
+                ticker=etf.ticker,
+                as_of=profile.as_of or datetime.now(UTC).date(),
+                aum=profile.aum,
+                return_1m=existing_metric.return_1m if existing_metric else None,
+                return_3m=existing_metric.return_3m if existing_metric else None,
+                return_ytd=existing_metric.return_ytd if existing_metric else None,
+                return_1y=existing_metric.return_1y if existing_metric else None,
+            )
+        )
+        changed = True
+    return changed
 
 
 def prepare_holdings_batch(etf: Etf, holdings: list[Holding]) -> list[Holding]:

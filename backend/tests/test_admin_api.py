@@ -188,6 +188,10 @@ async def test_collection_quality_returns_etf_staleness_and_errors(
                 name="iShares Factor ETF",
                 issuer="BlackRock",
                 discloses_daily=True,
+                exchange="NYSEArca",
+                aum=36_000_000_000,
+                in_signal_universe=True,
+                signal_universe_reason="eligible",
             )
         )
         session.add(
@@ -271,6 +275,10 @@ async def test_collection_quality_returns_etf_staleness_and_errors(
     assert dynf.total_holdings_count == 2
     assert dynf.missing_shares_count == 1
     assert dynf.last_collection_error == "rate-limit"
+    assert dynf.exchange == "NYSEArca"
+    assert dynf.aum == 36_000_000_000
+    assert dynf.in_signal_universe
+    assert dynf.signal_universe_reason == "eligible"
 
     arkk = next(item for item in response.items if item.ticker == "ARKK")
     assert arkk.is_stale

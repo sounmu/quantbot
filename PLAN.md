@@ -221,7 +221,7 @@
 ## 9. 진행 체크리스트
 
 - [x] A. 모바일 전용 UI 전환 (셸/하단탭/카드화/PWA/모바일 E2E) — + Pretendard Variable 폰트, holdings 브라우저(필터칩·정렬·검색·더보기), 선택 종목 차트를 목록 위로 배치
-- [ ] B. 유니버스 정제 (거래소·AUM 메타 + 게이팅) — **거래소 실태 조사 선행**
+- [x] B. 유니버스 정제 (거래소·AUM 메타 + 게이팅) — seed 티커 yfinance profile 실태 조사(`BTS`/Cboe US, `PCX`/NYSEArca, `NGM`/NasdaqGM, `NYQ`/NYSE) 반영, `0006_etf_exchange_aum`, `SIGNAL_MIN_AUM`/`SIGNAL_EXCHANGES`, quality/API 메타 노출 완료
 - [ ] C. Underlying security master + 가격 스토어(adj_close)
 - [ ] D. 시그널 모델 + ETF 횡단 conviction 집계
 - [ ] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단

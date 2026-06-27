@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.domain.entities import Etf, Holding, PricePoint
+from app.domain.entities import Etf, EtfProfile, Holding, PricePoint
 
 
 class HoldingsProvider(Protocol):
@@ -14,4 +14,4 @@ class HoldingsProvider(Protocol):
 class MarketDataProvider(Protocol):
     async def fetch_prices(self, ticker: str, *, lookback_days: int) -> list[PricePoint]: ...
 
-    async def fetch_profile(self, ticker: str) -> Etf | None: ...
+    async def fetch_profile(self, ticker: str) -> EtfProfile | None: ...

@@ -20,6 +20,10 @@ class EtfQualityItem(BaseModel):
     name: str
     issuer: str
     discloses_daily: bool
+    exchange: str | None = None
+    aum: float | None = None
+    in_signal_universe: bool = False
+    signal_universe_reason: str | None = None
     latest_holdings_date: date | None = None
     is_stale: bool = False
     missing_shares_count: int = 0

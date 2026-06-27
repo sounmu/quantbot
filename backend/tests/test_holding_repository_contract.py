@@ -6,11 +6,12 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.domain.entities import Etf, Holding, PricePoint
+from app.domain.entities import Etf, Holding, Metric, PricePoint
 from app.infrastructure.db.orm_models import Base
 from app.infrastructure.db.repositories import (
     SqlAlchemyEtfRepository,
     SqlAlchemyHoldingRepository,
+    SqlAlchemyMetricRepository,
     SqlAlchemyPriceRepository,
 )
 
@@ -55,6 +56,39 @@ async def test_holding_repository_snapshot_contract() -> None:
         history = await holdings.position_history("TEST", "AAPL")
         assert [holding.as_of_date for holding in history] == [date(2026, 1, 2), date(2026, 1, 3)]
         assert [holding.shares for holding in history] == [10, 12]
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_metric_repository_preserves_existing_aum_on_return_only_update() -> None:
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+
+    async with session_factory() as session:
+        etfs = SqlAlchemyEtfRepository(session)
+        metrics = SqlAlchemyMetricRepository(session)
+        await etfs.upsert(Etf(ticker="DYNF", name="DYNF", issuer="BlackRock"))
+        await metrics.upsert(Metric(ticker="DYNF", as_of=date(2026, 1, 2), aum=200_000_000))
+        await metrics.upsert(
+            Metric(ticker="DYNF", as_of=date(2026, 1, 3), aum=None, return_1y=12.5)
+        )
+        await session.commit()
+
+        metric = await metrics.get("DYNF")
+        etf = await etfs.get("DYNF")
+        assert metric is not None
+        assert metric.aum == 200_000_000
+        assert metric.return_1y == 12.5
+        assert etf is not None
+        assert etf.aum == 200_000_000
 
     await engine.dispose()
 

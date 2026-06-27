@@ -188,7 +188,7 @@ async def collection_quality(
             line = line.strip()
             if not line:
                 continue
-            match = re.match(r"^([A-Z0-9]+)\s+(holdings|prices):\s*(.+)", line)
+            match = re.match(r"^([A-Z0-9]+)\s+(profile|holdings|prices):\s*(.+)", line)
             if match:
                 ticker = match.group(1)
                 errors_by_ticker[ticker] = match.group(3)
@@ -209,6 +209,10 @@ async def collection_quality(
                 name=etf.name,
                 issuer=etf.issuer,
                 discloses_daily=etf.discloses_daily,
+                exchange=etf.exchange,
+                aum=etf.aum,
+                in_signal_universe=etf.in_signal_universe,
+                signal_universe_reason=etf.signal_universe_reason,
                 latest_holdings_date=latest_date,
                 is_stale=etf.discloses_daily
                 and (latest_date is None or latest_date < threshold),

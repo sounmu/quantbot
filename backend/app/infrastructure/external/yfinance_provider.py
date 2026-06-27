@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
-from app.domain.entities import Etf, Holding, PricePoint
+from app.domain.entities import EtfProfile, Holding, PricePoint
 from app.domain.value_objects import normalize_ticker
 from app.infrastructure.external.base import with_backoff
 
@@ -19,8 +19,13 @@ class YFinanceMarketDataProvider:
 
         return await with_backoff(operation)
 
-    async def fetch_profile(self, ticker: str) -> Etf | None:
-        return None
+    async def fetch_profile(self, ticker: str) -> EtfProfile | None:
+        normalized = normalize_ticker(ticker)
+
+        async def operation() -> EtfProfile | None:
+            return await asyncio.to_thread(self._fetch_profile_sync, normalized)
+
+        return await with_backoff(operation)
 
     async def fetch_holdings(self, ticker: str) -> list[Holding]:
         return []
@@ -54,6 +59,23 @@ class YFinanceMarketDataProvider:
             )
         return points
 
+    def _fetch_profile_sync(self, ticker: str) -> EtfProfile | None:
+        import yfinance as yf
+
+        info = yf.Ticker(ticker).info
+        exchange = self._string_or_none(info.get("fullExchangeName")) or self._string_or_none(
+            info.get("exchange")
+        )
+        aum = self._float_or_none(info.get("totalAssets"))
+        if exchange is None and aum is None:
+            return None
+        return EtfProfile(
+            ticker=ticker,
+            as_of=datetime.now(UTC).date(),
+            exchange=exchange,
+            aum=aum,
+        )
+
     def _date_from_index(self, value: Any) -> date:
         if hasattr(value, "date"):
             return value.date()
@@ -73,3 +95,9 @@ class YFinanceMarketDataProvider:
     def _int_or_none(self, value: Any) -> int | None:
         number = self._float_or_none(value)
         return int(number) if number is not None else None
+
+    def _string_or_none(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None

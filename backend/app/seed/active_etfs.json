@@ -5,6 +5,7 @@
     "issuer": "ARK",
     "theme": "Innovation",
     "expense_ratio": 0.75,
+    "exchange": "Cboe US",
     "discloses_daily": true
   },
   {
@@ -13,6 +14,7 @@
     "issuer": "ARK",
     "theme": "Genomics",
     "expense_ratio": 0.75,
+    "exchange": "Cboe US",
     "discloses_daily": true
   },
   {
@@ -21,6 +23,7 @@
     "issuer": "ARK",
     "theme": "Internet",
     "expense_ratio": 0.88,
+    "exchange": "Cboe US",
     "discloses_daily": true
   },
   {
@@ -29,6 +32,7 @@
     "issuer": "ARK",
     "theme": "Fintech",
     "expense_ratio": 0.75,
+    "exchange": "Cboe US",
     "discloses_daily": true
   },
   {
@@ -37,6 +41,7 @@
     "issuer": "ARK",
     "theme": "Space",
     "expense_ratio": 0.75,
+    "exchange": "Cboe US",
     "discloses_daily": true
   },
   {
@@ -44,14 +49,16 @@
     "name": "JPMorgan Equity Premium Income ETF",
     "issuer": "JPMorgan",
     "theme": "Income",
-    "expense_ratio": 0.35
+    "expense_ratio": 0.35,
+    "exchange": "NYSEArca"
   },
   {
     "ticker": "JEPQ",
     "name": "JPMorgan Nasdaq Equity Premium Income ETF",
     "issuer": "JPMorgan",
     "theme": "Income",
-    "expense_ratio": 0.35
+    "expense_ratio": 0.35,
+    "exchange": "NasdaqGM"
   },
   {
     "ticker": "CGGR",
@@ -59,6 +66,7 @@
     "issuer": "Capital Group",
     "theme": "Growth",
     "expense_ratio": 0.39,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -67,6 +75,7 @@
     "issuer": "Capital Group",
     "theme": "Dividend",
     "expense_ratio": 0.33,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -74,7 +83,8 @@
     "name": "Dimensional U.S. Core Equity 2 ETF",
     "issuer": "Dimensional",
     "theme": "Core Equity",
-    "expense_ratio": 0.17
+    "expense_ratio": 0.17,
+    "exchange": "NYSEArca"
   },
   {
     "ticker": "AVUV",
@@ -82,6 +92,7 @@
     "issuer": "Avantis",
     "theme": "Small Value",
     "expense_ratio": 0.25,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -90,6 +101,7 @@
     "issuer": "Avantis",
     "theme": "International Value",
     "expense_ratio": 0.36,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -98,6 +110,7 @@
     "issuer": "Virtus",
     "theme": "Preferred Income",
     "expense_ratio": 1.51,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -106,6 +119,7 @@
     "issuer": "BlackRock",
     "theme": "Factor Rotation",
     "expense_ratio": 0.30,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -113,7 +127,8 @@
     "name": "Fidelity Blue Chip Growth ETF",
     "issuer": "Fidelity",
     "theme": "Growth",
-    "expense_ratio": 0.59
+    "expense_ratio": 0.59,
+    "exchange": "Cboe US"
   },
   {
     "ticker": "TCAF",
@@ -121,6 +136,7 @@
     "issuer": "T. Rowe Price",
     "theme": "Capital Appreciation",
     "expense_ratio": 0.31,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -129,6 +145,7 @@
     "issuer": "State Street",
     "theme": "Fixed Income",
     "expense_ratio": 0.55,
+    "exchange": "NYSEArca",
     "discloses_daily": true
   },
   {
@@ -136,13 +153,15 @@
     "name": "PIMCO Enhanced Short Maturity Active ETF",
     "issuer": "PIMCO",
     "theme": "Short Duration",
-    "expense_ratio": 0.35
+    "expense_ratio": 0.35,
+    "exchange": "NYSEArca"
   },
   {
     "ticker": "BOND",
     "name": "PIMCO Active Bond ETF",
     "issuer": "PIMCO",
     "theme": "Fixed Income",
-    "expense_ratio": 0.56
+    "expense_ratio": 0.56,
+    "exchange": "NYSE"
   }
 ]

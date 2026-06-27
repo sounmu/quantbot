@@ -7,17 +7,29 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.application.services.universe_service import SignalUniversePolicy, refresh_signal_universe
 from app.config import get_settings
 from app.infrastructure.db.engine import SessionLocal, init_db
-from app.infrastructure.db.repositories import SqlAlchemyEtfRepository
+from app.infrastructure.db.repositories import SqlAlchemyEtfRepository, SqlAlchemyMetricRepository
 from app.infrastructure.external.universe import load_seed_universe
 from app.infrastructure.scheduler.jobs import create_scheduler
 from app.interfaces.api import admin, changes, etfs, meta
 
 
 async def seed_universe() -> int:
+    settings = get_settings()
     async with SessionLocal() as session:
-        count = await load_seed_universe(SqlAlchemyEtfRepository(session))
+        etfs = SqlAlchemyEtfRepository(session)
+        metrics = SqlAlchemyMetricRepository(session)
+        count = await load_seed_universe(etfs, metrics=metrics)
+        await refresh_signal_universe(
+            etfs,
+            metrics,
+            SignalUniversePolicy(
+                min_aum=settings.signal_min_aum,
+                exchanges=settings.signal_exchange_list,
+            ),
+        )
         await session.commit()
         return count
 

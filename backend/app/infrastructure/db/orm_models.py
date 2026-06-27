@@ -32,6 +32,12 @@ class EtfORM(Base):
     issuer: Mapped[str] = mapped_column(String(120), index=True)
     theme: Mapped[str | None] = mapped_column(String(120), index=True)
     expense_ratio: Mapped[float | None] = mapped_column(Float)
+    exchange: Mapped[str | None] = mapped_column(String(64), index=True)
+    aum: Mapped[float | None] = mapped_column(Float)
+    in_signal_universe: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    signal_universe_reason: Mapped[str | None] = mapped_column(String(120))
     inception_date: Mapped[date | None] = mapped_column(Date)
     is_active_etf: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     discloses_daily: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

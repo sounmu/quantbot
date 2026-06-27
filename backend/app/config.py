@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     scheduler_catch_up_on_startup: bool = True
     scheduler_stale_after_days: int = Field(default=1, ge=0)
     holdings_http_timeout: float = Field(default=30.0, gt=0)
+    signal_min_aum: float = Field(default=100_000_000, ge=0)
+    signal_exchanges: str = (
+        "NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,"
+        "NYSE,NYQ,NYSEArca,NYSE Arca,PCX,"
+        "Cboe US,Cboe BZX,BATS,BTS,NYSE American,ASE"
+    )
     admin_token: str = "change-me"
     admin_allowed_emails: str = ""  # comma-separated
     admin_allowed_groups: str = ""  # comma-separated
@@ -37,6 +43,14 @@ class Settings(BaseSettings):
         if "*" in origins:
             raise ValueError("CORS_ORIGINS cannot contain '*' while credentials are enabled")
         return origins
+
+    @property
+    def signal_exchange_list(self) -> list[str]:
+        return [
+            exchange.strip()
+            for exchange in self.signal_exchanges.split(",")
+            if exchange.strip()
+        ]
 
     @property
     def allowed_email_set(self) -> set[str] | None:

@@ -45,6 +45,10 @@ class SqlAlchemyEtfRepository:
                     issuer=etf.issuer,
                     theme=etf.theme,
                     expense_ratio=etf.expense_ratio,
+                    exchange=etf.exchange,
+                    aum=etf.aum,
+                    in_signal_universe=etf.in_signal_universe,
+                    signal_universe_reason=etf.signal_universe_reason,
                     inception_date=etf.inception_date,
                     is_active_etf=etf.is_active_etf,
                     discloses_daily=etf.discloses_daily,
@@ -58,6 +62,10 @@ class SqlAlchemyEtfRepository:
         row.issuer = etf.issuer
         row.theme = etf.theme
         row.expense_ratio = etf.expense_ratio
+        row.exchange = etf.exchange
+        row.aum = etf.aum
+        row.in_signal_universe = etf.in_signal_universe
+        row.signal_universe_reason = etf.signal_universe_reason
         row.inception_date = etf.inception_date
         row.is_active_etf = etf.is_active_etf
         row.discloses_daily = etf.discloses_daily
@@ -471,6 +479,8 @@ class SqlAlchemyMetricRepository:
         )
         if etf is None:
             return
+        if metric.aum is not None:
+            etf.aum = metric.aum
 
         row = await self._s.scalar(select(EtfMetricORM).where(EtfMetricORM.etf_id == etf.id))
         if row is None:
@@ -488,7 +498,8 @@ class SqlAlchemyMetricRepository:
             return
 
         row.as_of = metric.as_of
-        row.aum = metric.aum
+        if metric.aum is not None:
+            row.aum = metric.aum
         row.return_1m = metric.return_1m
         row.return_3m = metric.return_3m
         row.return_ytd = metric.return_ytd
