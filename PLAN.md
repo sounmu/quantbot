@@ -1,512 +1,231 @@
-# 액티브 ETF 보유비중 변동 추적기 — 구현 명세서
+# Quantbot — 다음 단계 로드맵 (PLAN.md)
 
-> 이 문서는 코딩 에이전트(Codex 등)가 단계별로 그대로 구현할 수 있도록 작성된 실행 명세서다.
-> 각 단계는 **목표 → 작업 항목 → 산출 파일 → 완료 기준(Acceptance)** 순서로 구성된다.
-> 위에서부터 순서대로 구현하면 동작하는 제품이 완성된다.
-
----
-
-## 0. 프로젝트 개요
-
-미국 상장 **액티브 ETF가 매일 어떤 종목을 사고/팔고/비중을 늘리고 줄이는지**를
-발행사 공식 일별 보유종목(holdings) 공시로 수집·축적하고, **스냅샷 간 변화(diff)** 를 계산해
-"이 ETF가 오늘/이번 주에 무엇을 매매했는가"와 "특정 종목 비중의 시간 추이"를 보여주는 추적 도구.
-(ARK 트래커 스타일을 투명 액티브 ETF 전반으로 확장.)
-
-### 핵심 결정 사항 (확정됨)
-- **추적 기준 = 보유 주식수(shares) + 비중(%) 둘 다.**
-  비중%는 가격 변동만으로도 변하므로, **실제 매니저 매매는 shares Δ로 판정**하고 비중%는 배분 변화 보조지표로 함께 표시한다.
-- **데이터 소스 = 발행사 공식 일별 holdings CSV/XLSX/JSON.** httpx로 직접 다운로드·파싱. ARK 어댑터를 먼저, 이후 발행사별 어댑터를 점진 추가.
-- **유니버스 = 투명 액티브 ETF 전반.** 발행사별 멀티포맷 어댑터를 registry로 확장.
-- **가격/수익률은 보조 컨텍스트**(yfinance). 핵심은 holdings 변동이다.
-- **아키텍처**: **DDD + 헥사고날(포트 & 어댑터)** — 도메인/애플리케이션은 추상 **포트**에만 의존, DB·외부 소스는 교체 가능한 **어댑터**로 격리. → SQLite↔PostgreSQL 전환을 "어댑터 + DATABASE_URL 교체"만으로 처리.
-- **배포**: 프론트 = **Vercel**, 백엔드 = **Oracle Cloud Always Free** (ARM VM, Docker)
-
-### 핵심 화면/기능
-1. **ETF 상세 — holdings 스냅샷**: 보유종목 표(shares·시장가치·비중) + 행별 **직전 대비 변동 배지**(신규/청산/▲증가/▼감소), 스냅샷 날짜 선택
-2. **ETF 변동(트레이드) 피드**: 특정 ETF의 일별 매매 내역(신규·청산·증감)
-3. **종목 추세 차트**: 한 종목의 shares·비중 시계열
-4. **유니버스 전체 "최근 매매" 피드**: 모든 추적 ETF 횡단 트레이드
-5. (보조) 목록·검색·필터, 가격/수익률 차트
-
-### 기술 스택
-| 구분 | 기술 | 버전(권장) |
-|---|---|---|
-| 백엔드 | FastAPI | 0.115+ |
-| ORM | SQLAlchemy (async) | 2.0+ |
-| 마이그레이션 | Alembic | 1.13+ |
-| 스케줄러 | APScheduler | 3.10+ |
-| HTTP 클라이언트 | httpx | 0.27+ |
-| holdings 수집 | 발행사 공식 CSV/XLSX/JSON (httpx 다운로드 + 포맷별 파싱) | - |
-| 가격 수집(보조) | yfinance | 0.2.40+ |
-| 검증 | Pydantic | 2.x |
-| DB | **SQLite(MVP) → PostgreSQL 이관 가능 구조** | - |
-| 프론트 | Next.js (App Router, TypeScript) | 15+ |
-| 데이터 패칭 | TanStack Query | 5+ |
-| 스타일 | Tailwind CSS + shadcn/ui | - |
-| 차트 | Recharts | 2.x |
-| 아키텍처 | DDD + 헥사고날(포트 & 어댑터) | 1.5장 |
-| 백엔드 배포 | Oracle Cloud Always Free (ARM VM, Docker) | - |
-| 프론트 배포 | Vercel | - |
-
-### 기본 설계 원칙
-- DB는 SQLite로 시작하되 **SQLAlchemy async + DATABASE_URL**로 추상화해 Postgres 전환 시 코드 변경 최소화.
-- 외부 데이터(발행사 holdings/yfinance)는 모두 `infrastructure/external/`에 어댑터로 격리. backoff/에러 로깅 필수.
-- **holdings는 매일 스냅샷으로 누적**한다(`as_of_date`가 스냅샷 키). 변동은 스냅샷 diff로 파생한다.
-- 프론트는 백엔드 REST만 소비. 화면 UI는 한국어, 데이터는 USD 기준.
+> 이 문서는 **앞으로 할 일**을 기록하는 살아있는 로드맵이다.
+> 이미 구현된 내용(헥사고날 백엔드, 발행사 holdings 수집, shares 기반 diff 엔진, 변동 API/피드, 수집 품질 대시보드)은 `CLAUDE.md`와 git 히스토리에 정리되어 있으므로 여기서 반복하지 않는다.
+> 각 단계는 **목표 → 근거 → 작업 항목 → 완료 기준(Acceptance)** 순서로 쓴다. 위에서부터 의존 순서대로 진행한다.
 
 ---
 
-## 1. 모노레포 디렉토리 구조 (최종 목표)
+## 0. North Star (최종 목표)
 
-```
-quantbot/
-├─ PLAN.md
-├─ README.md
-├─ docker-compose.yml
-├─ .env.example
-├─ backend/                          # 헥사고날(포트 & 어댑터) 계층 구조
-│  ├─ pyproject.toml
-│  ├─ Dockerfile
-│  ├─ alembic.ini
-│  ├─ alembic/{env.py, versions/}
-│  └─ app/
-│     ├─ main.py                     # 컴포지션 루트: DI 와이어링, 스케줄러 등록
-│     ├─ config.py
-│     │
-│     ├─ domain/                     # ⬛ 도메인 — 외부 의존 0
-│     │  ├─ entities.py              # Etf, PricePoint, Holding(+shares/market_value), HoldingChange
-│     │  ├─ value_objects.py         # normalize_ticker, holding_key, ChangeType
-│     │  └─ repositories.py          # 포트: EtfRepository, HoldingRepository, HoldingChangeRepository ...
-│     │
-│     ├─ application/                # ⬛ 애플리케이션 — 포트에만 의존
-│     │  ├─ services/
-│     │  │  ├─ etf_service.py
-│     │  │  ├─ metric_service.py
-│     │  │  └─ holding_change_service.py   # 스냅샷 diff 엔진(순수 함수)
-│     │  ├─ ports.py                 # MarketDataProvider, HoldingsProvider
-│     │  └─ pipeline/collect.py      # 수집+diff 오케스트레이션(포트만 호출)
-│     │
-│     ├─ infrastructure/             # ⬛ 어댑터 — 실제 기술 구현
-│     │  ├─ db/{engine,orm_models,mappers,repositories}.py
-│     │  ├─ external/
-│     │  │  ├─ base.py               # with_backoff 등 공통
-│     │  │  ├─ yfinance_provider.py  # 가격(보조)
-│     │  │  ├─ universe.py           # 유니버스 시드 로딩
-│     │  │  └─ holdings/             # 발행사별 holdings 어댑터
-│     │  │     ├─ base_csv.py        # CSV/XLSX/JSON 다운로드/정규화 공통
-│     │  │     ├─ ark_provider.py    # ARK 공식 일별 CSV 파서
-│     │  │     └─ registry.py        # issuer/ticker → HoldingsProvider 매핑
-│     │  └─ scheduler/jobs.py
-│     │
-│     ├─ interfaces/                 # ⬛ 진입점 — FastAPI
-│     │  ├─ api/{etfs,changes,meta,admin}.py
-│     │  ├─ schemas/{etf,price,holding,change,common}.py
-│     │  └─ deps.py                  # 포트 → 어댑터 바인딩
-│     │
-│     └─ seed/active_etfs.json       # 유니버스(티커+발행사+분류+공시방식)
-└─ frontend/
-   ├─ app/
-   │  ├─ etfs/{page.tsx, [ticker]/page.tsx}   # 목록 / 상세(holdings·변동·차트)
-   │  ├─ changes/page.tsx                       # 전체 최근 매매 피드
-   │  ├─ compare/page.tsx
-   │  └─ providers.tsx
-   ├─ components/    # EtfTable, HoldingsTable(+변동 배지), ChangeFeed, PositionHistoryChart, PriceChart ...
-   ├─ lib/{api.ts, types.ts}
-   └─ hooks/         # useEtfs, useEtfDetail, useHoldings, useHoldingChanges, usePositionHistory, useRecentChanges
-```
+**일류 액티브 ETF 매니저들이 사는 종목을 따라 사서 내 수익률을 높인다.**
+
+투명 액티브 ETF는 일급 운용역들이 매일 보유내역을 공시한다 = **스마트머니의 손패가 매일 공개**된다. Quantbot의 목적은 이 정보로
+1. **그들이 지금 무엇을 모으고 있는지**(오늘의 실행 가능한 "따라 살 후보")를 보여주고,
+2. **그렇게 따라 샀을 때 실제로 돈이 됐는지**(과거 시그널의 검증된 성과)를 함께 보여줘서 신뢰할 수 있게 만드는 것이다.
+
+> 즉 ① **실행(무엇을 따라 살까)** 이 제품의 본체이고, ② **검증(Phase E)** 은 그 실행을 믿어도 되는지 뒷받침하는 근거다. 검증 없는 추종은 도박, 추종 없는 검증은 논문일 뿐 — 둘 다 필요하다.
+
+### 핵심 가설 (= 따라 사기가 통하는 조건)
+> 여러 투명 액티브 ETF가 **동시에 주식수를 늘리는(shares↑) 종목**은, 매수 시점 이후 일정 기간 동안 **벤치마크 대비 초과수익(excess return)** 을 낸다. → 이게 사실이면 "컨빅션 높은 종목을 따라 사는" 전략이 성립한다.
+
+### 불변 원칙 (기존 + 신규)
+- **매매 판정은 항상 `shares` Δ 기준.** `weight` Δ는 가격 드리프트가 섞이므로 시그널의 주축이 아니라 보조축이다. (분석에서도 동일: "비중이 올랐다"는 가격 때문일 수 있으므로, **주식수가 오른** 케이스를 1차 시그널로 본다.)
+- **Point-in-time 규율.** holdings는 장 마감 후 공시되므로, 시그널은 `as_of_date` 다음 거래일(T+1)부터 실행 가능한 것으로 간주한다. forward return은 반드시 공시 인지 시점 **이후** 가격으로만 계산한다(look-ahead 금지).
+- **초과수익으로 평가.** 상승장에서는 아무거나 오르므로 raw return이 아니라 벤치마크(QQQ/SPY 또는 모펀드 ETF) 대비 초과수익으로 시그널을 평가한다.
+
+### 대상 유니버스 (확정)
+- **주요 거래소(NASDAQ·NYSE Arca·Cboe BZX 등) 상장 + AUM ≥ $100M의 투명 액티브 ETF.** "나스닥 한정"은 모집단을 과하게 줄여서 **주요 거래소 + 규모 절충**으로 확정. 규모 임계값 `SIGNAL_MIN_AUM = 100_000_000`(env로 조정).
+- 분석(가격 검증) 대상은 **미국 상장 주식을 보유하는 equity 액티브 ETF**로 한정한다. 채권/우선주 ETF(TOTL, PFFA 등)는 diff 추적은 유지하되 **시그널-가격 분석에서는 제외**한다(개별 종목 가격 매핑 비용·의미 한계).
 
 ---
 
-## 1.5 아키텍처: DDD + 헥사고날 (포트 & 어댑터)
+## 현재 상태 → 목표 간 격차 (Gap Analysis)
 
-### 의존성 규칙 (가장 중요)
-> **의존성은 항상 안쪽(도메인)으로만 향한다.** 도메인은 그 무엇도 import 하지 않는다.
+| 영역 | 지금 | 최종 목표에 필요한 것 |
+|---|---|---|
+| 가격 데이터 | **ETF 자체** 가격만(yfinance) | **개별 보유종목(underlying)** 일별 가격 |
+| 종목 정체성 | `holding_key`(ID/ticker/name) | `holding_key` → **거래 가능한 미국 주식 심볼** 해석 |
+| 시그널 | per-ETF 변동 행 | **ETF 횡단 집계(conviction)** + 크기 버킷 |
+| 평가 | 없음 | **forward return / hit rate / IC** 계산 엔진 |
+| 유니버스 | 손큐레이션 ~75개 | **나스닥 + AUM 게이팅** + 거래소/AUM 메타 |
+| UI | 반응형(테이블 중심, PC 가정) | **모바일 전용** 레이아웃 + 분석 화면 |
 
-```
-interfaces (FastAPI)        ─┐
-infrastructure (DB/외부소스) ─┼──▶  application  ──▶  domain
-                             │      (포트 사용)      (포트 정의)
-                             └──▶ (포트 구현)
-```
-
-- **domain**: 엔티티·값객체·**포트(추상 인터페이스)**. SQLAlchemy·httpx·FastAPI를 절대 import 안 함.
-- **application**: 유스케이스/서비스 + **diff 엔진**. 포트에만 의존. 어떤 DB/소스인지 모름.
-- **infrastructure**: 포트의 **구현(어댑터)**. SQLAlchemy 리포지토리, 발행사 CSV 파서, yfinance 등 실제 기술 격리.
-- **interfaces**: FastAPI 라우터 + DTO. `deps.py`에서 포트에 어댑터 주입.
-
-### SQLite → PostgreSQL 전환
-1. 상위 계층은 `EtfRepository`/`HoldingRepository` 등 **포트**만 사용 → DB 종류를 모름.
-2. 실제 DB 접근은 `infrastructure/db/repositories.py`에만 존재.
-3. `DATABASE_URL` 드라이버만 교체(`sqlite+aiosqlite` → `postgresql+asyncpg`)하면 동일 구현이 양쪽에서 동작.
-4. DB별 방언(upsert, JSON, bigint)이 필요하면 **그 차이도 어댑터 내부에만** 둔다.
-5. **계약 테스트**를 SQLite/Postgres 양쪽 어댑터에 돌려 동등성 보장.
-
-### 도메인 엔티티 ↔ ORM 분리
-- 도메인 엔티티(`domain/entities.py`)와 ORM 모델(`infrastructure/db/orm_models.py`)을 **분리**하고 `mappers.py`로 변환.
-
-### diff 엔진은 순수 함수
-- `holding_change_service.diff(...)`는 외부 의존 0인 순수 함수 → DB 없이 픽스처만으로 단위 테스트.
-- 서비스 테스트는 **인메모리 가짜 리포지토리**로 DB 없이 검증.
-
-### 포트/어댑터 코드 스켈레톤
-
-> 계층 간 의존 방향과 핵심 도메인 타입을 보여주는 **최소 골격**. 실제 구현 시 필드/메서드를 확장한다.
-
-**① 도메인 엔티티** — `domain/entities.py` (외부 의존 0)
-```python
-from dataclasses import dataclass
-from datetime import date
-
-@dataclass(slots=True)
-class Holding:
-    ticker: str                 # 모펀드 티커 (예: ARKK)
-    as_of_date: date            # 스냅샷 날짜 (= 스냅샷 키)
-    holding_name: str
-    weight: float               # 비중(%)
-    holding_ticker: str | None = None
-    shares: float | None = None         # 보유 주식수 (실제 매매 판정 기준)
-    market_value: float | None = None   # 시장가치($)
-
-@dataclass(slots=True)
-class HoldingChange:
-    ticker: str
-    as_of_date: date            # 새 스냅샷 날짜
-    prev_date: date | None
-    holding_name: str
-    holding_ticker: str | None
-    change_type: str            # NEW | EXIT | INCREASE | DECREASE | UNCHANGED
-    shares_before: float | None
-    shares_after: float | None
-    shares_delta: float | None
-    shares_delta_pct: float | None      # 직전 대비 % 증감
-    weight_before: float | None
-    weight_after: float | None
-    weight_delta: float | None
-```
-
-**② 값객체/매칭 키** — `domain/value_objects.py`
-```python
-import re
-
-class ChangeType:
-    NEW = "NEW"; EXIT = "EXIT"; INCREASE = "INCREASE"
-    DECREASE = "DECREASE"; UNCHANGED = "UNCHANGED"
-
-_CASH_TOKENS = {"CASH", "USD", "DOLLAR", "--", ""}
-
-def holding_key(holding_ticker: str | None, holding_name: str) -> str | None:
-    """스냅샷 간 종목 매칭 키: 티커 우선, 없으면 정규화 이름. 현금/노이즈는 None(제외)."""
-    if holding_ticker and holding_ticker.strip().upper() not in _CASH_TOKENS:
-        return holding_ticker.strip().upper()
-    name = re.sub(r"[^A-Z0-9]", "", holding_name.upper())
-    if not name or name in _CASH_TOKENS:
-        return None
-    return f"NAME:{name}"
-```
-
-**③ holdings 포트** — `application/ports.py`
-```python
-from typing import Protocol
-from app.domain.entities import Etf, Holding, PricePoint
-
-class HoldingsProvider(Protocol):
-    """발행사별 holdings 어댑터가 구현하는 포트."""
-    def supports(self, issuer: str) -> bool: ...
-    async def fetch_holdings(self, etf: Etf) -> list[Holding]: ...  # 최신 일별 스냅샷(shares 포함)
-
-class MarketDataProvider(Protocol):       # 가격(보조)
-    async def fetch_prices(self, ticker: str, *, lookback_days: int) -> list[PricePoint]: ...
-```
-
-**④ diff 엔진** — `application/services/holding_change_service.py` (순수 함수)
-```python
-from datetime import date
-from app.domain.entities import Holding, HoldingChange
-from app.domain.value_objects import ChangeType, holding_key
-
-class HoldingChangeService:
-    def __init__(self, *, shares_epsilon: float = 1.0) -> None:
-        self._eps = shares_epsilon   # 반올림 노이즈 무시 임계치
-
-    def diff(self, ticker: str, as_of: date, prev_date: date | None,
-             current: list[Holding], previous: list[Holding]) -> list[HoldingChange]:
-        cur = {k: h for h in current if (k := holding_key(h.holding_ticker, h.holding_name))}
-        prev = {k: h for h in previous if (k := holding_key(h.holding_ticker, h.holding_name))}
-        changes: list[HoldingChange] = []
-        for key in cur.keys() | prev.keys():
-            c, p = cur.get(key), prev.get(key)
-            changes.append(self._classify(ticker, as_of, prev_date, c, p))
-        return changes
-    # _classify: shares_delta(없으면 weight_delta)로 NEW/EXIT/INCREASE/DECREASE/UNCHANGED 판정
-```
-
-**⑤ ARK CSV 어댑터** — `infrastructure/external/holdings/ark_provider.py` (포트 구현)
-```python
-from app.application.ports import HoldingsProvider
-from app.domain.entities import Etf, Holding
-
-class ArkHoldingsProvider:                # HoldingsProvider 구현
-    _CSV = "https://assets.ark-funds.com/fund-documents/funds-etf-csv/ARK_{fund}_HOLDINGS.csv"
-    def supports(self, issuer: str) -> bool: return issuer.upper() == "ARK"
-    async def fetch_holdings(self, etf: Etf) -> list[Holding]:
-        ...  # httpx 다운로드 → csv 파싱 → date/ticker/shares/"market value ($)"/"weight (%)" 정규화
-```
-
-**⑥ DI 와이어링** — `interfaces/deps.py`
-```python
-def get_holding_repo(session = Depends(get_session)) -> SqlAlchemyHoldingRepository:
-    return SqlAlchemyHoldingRepository(session)   # ← DB 교체 시 이 어댑터만
-# HoldingsProvider registry, HoldingChangeService도 동일하게 주입
-```
-
-> 포인트: 상위 계층은 **포트 타입만 참조**한다. DB 교체는 ⑤ 어댑터 + `DATABASE_URL`만, 데이터 소스 추가는 새 `HoldingsProvider` 어댑터 + registry 등록만으로 끝난다. 도메인·서비스·diff 엔진은 그대로다.
+→ 단계는 **데이터 토대(C) → 시그널(D) → 평가(E) → 표현(F)** 순으로 쌓고, 그와 병행해 **모바일 전환(A)** 과 **유니버스 정제(B)** 를 먼저/동시에 처리한다.
 
 ---
 
-## 2. 데이터 모델 명세
+## Phase A — 모바일 전용 UI 전환
 
-### 2.1 `etf`
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| ticker | str, unique, index | 예: ARKK |
-| name | str | 펀드 정식명 |
-| issuer | str, index | 운용사 |
-| theme | str, nullable, index | 테마/카테고리 |
-| expense_ratio | float, nullable | 보수율(%) |
-| inception_date | date, nullable | |
-| is_active_etf | bool, default True | |
-| discloses_daily | bool, default True | **일별 holdings 공시 여부**(준투명 ETF=False, diff 대상 제외) |
-| currency | str, default "USD" | |
-| description | text, nullable | |
-| created_at / updated_at | datetime | |
+**목표**: PC 레이아웃 가정을 버리고 **모바일 단일 컬럼 / 카드 / 하단 탭** 중심으로 재설계한다. 설치형 PWA를 지향한다.
 
-### 2.2 `etf_holding` (일별 스냅샷) — **shares/market_value 추가**
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| etf_id | FK→etf, index | |
-| as_of_date | date, index | 스냅샷 날짜 |
-| holding_ticker | str, nullable, index | |
-| holding_name | str | |
-| weight | float | 비중(%) |
-| **shares** | float, nullable | **보유 주식수** |
-| **market_value** | float, nullable | **시장가치($)** |
-| (etf_id, as_of_date, holding_ticker, holding_name) | **unique 제약** | 스냅샷 멱등성 |
-
-### 2.3 `etf_holding_change` (스냅샷 간 파생 변동) — **신규**
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| etf_id | FK→etf, index | |
-| as_of_date | date | 새 스냅샷 날짜 |
-| prev_date | date, nullable | 비교 기준(직전) 스냅샷 |
-| holding_ticker | str, nullable | |
-| holding_name | str | |
-| change_type | str | NEW/EXIT/INCREASE/DECREASE/UNCHANGED |
-| shares_before / shares_after / shares_delta / shares_delta_pct | float, nullable | |
-| weight_before / weight_after / weight_delta | float, nullable | |
-| 인덱스 | (etf_id, as_of_date), (etf_id, holding_ticker, as_of_date), (as_of_date) | 일별/종목이력/전체피드 |
-| (etf_id, as_of_date, holding_ticker, holding_name) | **unique 제약** | 재계산 멱등성 |
-
-### 2.4 `etf_price` (일별 시계열, 보조)
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| etf_id | FK→etf, index | |
-| date | date, index | |
-| open/high/low/close | float | |
-| nav | float, nullable | |
-| volume | bigint, nullable | |
-| (etf_id, date) | **unique 제약** | 멱등성 |
-
-### 2.5 `etf_metric` (집계 캐시, 보조)
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| etf_id | FK→etf, unique | 1:1 |
-| as_of | date | |
-| aum | float, nullable | |
-| return_1m / return_3m / return_ytd / return_1y | float, nullable | |
-
-### 2.6 `collection_run` (운영 로그)
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| id | int PK | |
-| job_name | str | |
-| status | str | running/success/**partial**/failed |
-| started_at / finished_at | datetime | |
-| items_processed | int | |
-| error | text, nullable | 종목/ETF 단위 실패 상세 |
-
----
-
-## 3. 단계별 구현
-
-> 현재 코드베이스에는 이미 헥사고날 골격 + 가격/목록/상세/비교(가격 기반)가 구현되어 있다.
-> 아래 단계는 그 위에 **holdings 스냅샷·변동 추적**을 더하는 작업이다.
-
-### 단계 M1 — 스키마·도메인 확장 (shares/market_value + HoldingChange)
-
-**목표**: 스냅샷에 주식수·시장가치를 담고, 변동 엔티티/테이블을 추가한다.
+**근거**: 최종 산출물은 "오늘 매니저가 무엇을 모으는가 + 그게 올랐는가"를 손에서 빠르게 보는 경험이다. 데이터 밀도 높은 테이블(현재 `EtfTable`/`HoldingsTable`)은 모바일에서 가독성이 떨어진다.
 
 **작업 항목**
-1. `domain/entities.py`: `Holding`에 `shares`, `market_value` 추가. 신규 `HoldingChange` 엔티티(2.3 필드).
-2. `domain/value_objects.py`: `ChangeType`, `holding_key()` 추가(현금/노이즈 제외 규칙).
-3. `domain/repositories.py`:
-   - `HoldingRepository`에 `snapshot(ticker, as_of_date)`, `latest_snapshot_date(ticker)`, `previous_snapshot_date(ticker, before)`, `snapshot_dates(ticker)`, `position_history(ticker, holding_key)` 추가.
-   - 신규 포트 `HoldingChangeRepository`: `upsert_many`, `for_snapshot`, `for_position`, `recent(limit, change_types=None)`.
-4. `infrastructure/db/orm_models.py`: `EtfHoldingORM`에 `shares`/`market_value` + unique 제약, 신규 `EtfHoldingChangeORM`(인덱스 포함), `EtfORM`에 `discloses_daily`.
-5. `infrastructure/db/mappers.py`: `to_holding`(shares/mv 포함), `to_holding_change`/역변환.
-6. Alembic 리비전 `0002_holdings_change.py`: etf_holding ALTER + etf_holding_change CREATE + etf.discloses_daily. **SQLite는 `batch_alter_table` 사용.**
+1. 레이아웃: `frontend/app/layout.tsx`에 모바일 고정 셸(최대폭 `max-w-[480px]` 중앙 정렬, `AppShell` 재작성). 데스크톱 전용 가로 테이블 제거.
+2. 내비게이션: 상단 nav → **하단 고정 탭바**(목록 / 변동피드 / 분석 / 비교). 터치 타겟 ≥44px, `aria-label` 유지.
+3. 컴포넌트 모바일화:
+   - `HoldingsTable` → **포지션 카드 리스트**(종목명·shares·weight + 변동 배지). 가로 스크롤 금지.
+   - `EtfTable` → ETF 카드.
+   - `ChangeFeed` → 타임라인형 카드.
+   - 차트(`PriceChart`/`PositionHistoryChart`/`CompareChart`)는 `ResponsiveContainer` 폭 100%, 모바일 높이 프리셋.
+4. PWA: `manifest.json`(standalone, theme color), 아이콘, `viewport`에 `viewport-fit=cover`. (선택) 오프라인 폴백.
+5. E2E: `frontend/e2e/`의 Playwright를 **모바일 뷰포트**(예: iPhone 13)로 고정, 핵심 페이지 smoke 갱신.
 
 **완료 기준**
-- 마이그레이션 up/down 정상. 기존 데이터 보존.
-- ORM ↔ 도메인 매핑 라운드트립 테스트 통과.
+- 360–430px 뷰포트에서 모든 페이지가 가로 스크롤 없이 렌더.
+- 하단 탭으로 4개 주요 화면 이동.
+- Playwright 모바일 smoke 통과. `npm run lint && npm run typecheck` 통과.
 
 ---
 
-### 단계 M2 — HoldingsProvider 포트 + ARK CSV 어댑터
+## Phase B — 유니버스 정제 (나스닥 + 규모 게이팅)
 
-**목표**: 발행사 공식 CSV로 일별 holdings(shares 포함) 스냅샷을 수집한다.
+**목표**: 추적 대상을 **주요 거래소 상장 + AUM ≥ $100M**의 액티브 ETF로 좁히고, 거래소·AUM 메타를 데이터로 보유한다.
+
+**근거**: 분석의 신뢰도는 "의미 있는 규모의" 펀드로 모집단을 정의할 때 올라간다. 규모가 큰 펀드일수록 creation/redemption 노이즈 대비 매니저 의사결정 신호가 또렷하다. "나스닥 한정"은 ARK 계열 등 다수가 NYSE Arca/Cboe BZX 상장이라 모집단을 과하게 줄이므로 **주요 거래소 + 규모 절충**으로 확정.
 
 **작업 항목**
-1. `application/ports.py`: `HoldingsProvider` 포트(`supports`, `fetch_holdings`).
-2. `infrastructure/external/holdings/base_csv.py`: httpx 다운로드 + csv 파싱 + 정규화 공통(현금/`--`/NaN 제거, 비중 % 스케일 통일, 숫자 파싱). `external/base.py:with_backoff` 재사용.
-3. `infrastructure/external/holdings/ark_provider.py`: ARK 펀드별 CSV URL 매핑, 컬럼(`date, fund, company, ticker, shares, "market value ($)", "weight (%)"`) → 도메인 `Holding` 정규화. CSV의 date를 `as_of_date`로.
-4. `infrastructure/external/holdings/registry.py`: 등록된 provider 목록에서 `supports(issuer)`로 선택. 미지원 발행사는 None(graceful skip).
-5. `seed/active_etfs.json`: `issuer`, `discloses_daily`, (ARK는 펀드코드) 필드 보강.
+1. 메타 확장: `etf`에 `exchange`(상장 거래소, MIC/이름)와 `aum`(이미 `etf_metric.aum` 존재 → 활용/승격) 추가. 새 alembic 마이그레이션(`0006_etf_exchange_aum`).
+2. AUM/거래소 소스: 1차로 yfinance `Ticker.info`(`totalAssets`, `exchange`) 어댑터에서 보강. 신뢰도 한계 문서화, 수동 보정 허용(시드 JSON에 override 필드).
+3. 게이팅: `universe.py`/`seed`에서 `exchange`·`aum` 기준으로 **분석 대상 플래그**(`in_signal_universe: bool`) 산출. 설정: `SIGNAL_MIN_AUM`(기본 `100_000_000`), `SIGNAL_EXCHANGES`(기본 주요 거래소 화이트리스트: NASDAQ·NYSE Arca·Cboe BZX 등).
+4. 품질 대시보드(`/api/admin/dashboard/quality`)에 거래소/AUM/게이팅 결과 컬럼 추가.
 
 **완료 기준**
-- ARK 티커(ARKK 등)에 대해 `fetch_holdings`가 shares·weight 채워진 스냅샷 반환.
-- 샘플 CSV 픽스처 기반 파싱 단위 테스트 통과(`tests/test_ark_provider.py`).
-- 미지원 발행사는 예외 없이 빈 결과로 skip.
+- 각 추적 ETF에 거래소·AUM이 채워지고, 게이팅 기준으로 분석 유니버스가 산출된다.
+- 임계값을 env로 바꾸면 분석 유니버스가 재계산된다.
 
 ---
 
-### 단계 M3 — diff 엔진 + 변동 저장 + 수집 파이프라인 개편
+## Phase C — 보유종목 가격 토대 (Underlying Security Master + Price Store)
 
-**목표**: 새 스냅샷과 직전 스냅샷을 비교해 변동을 계산·저장한다.
+**목표**: 개별 보유 주식의 **일별 가격 시계열**을 수집·저장한다. (분석의 데이터 토대 — 가장 무거운 단계.)
+
+**근거**: "비중이 오른 종목이 실제로 올랐는가"를 보려면 ETF가 아니라 **개별 종목**의 가격이 있어야 한다. 현재는 없다.
 
 **작업 항목**
-1. `application/services/holding_change_service.py`: `diff(...)` 순수 함수(1.5장 ④). shares_delta 기준 분류, shares 없으면 weight_delta 폴백, `shares_epsilon` 임계치, `shares_delta_pct`/`weight_delta` 계산.
-2. `infrastructure/db/repositories.py`: `SqlAlchemyHoldingRepository`에 신규 포트 메서드 구현(스냅샷/이전날짜/이력 쿼리), `SqlAlchemyHoldingChangeRepository` 구현. **upsert는 N+1 회피**(ETF id 1회 조회, 날짜 묶음 비교).
-3. `application/pipeline/collect.py` 개편:
-   - ETF별: registry로 provider 선택 → `fetch_holdings` → 스냅샷 upsert(shares) → `previous_snapshot_date` 로드 → `HoldingChangeService.diff` → `HoldingChangeRepository.upsert_many`.
-   - 가격/지표 수집은 보조 단계로 유지(`discloses_daily=False`는 holdings diff 건너뜀).
-   - per-ETF try/except로 부분 실패 격리, `collection_run`에 ETF 단위 에러 기록, 일부 실패 시 상태 `partial`.
-4. `interfaces/deps.py`: HoldingsProvider registry, HoldingChangeService, HoldingChangeRepository 주입 추가.
+1. **Security master**: `holding_key` → 거래 가능한 미국 주식 심볼 해석.
+   - 1차: `holding_ticker`가 있는 US equity 행만 대상(대부분의 ARK/Avantis/iShares equity 보유가 해당).
+   - `security_id`(CUSIP/ISIN)만 있고 ticker가 없는 행은 분석에서 보류(향후 CUSIP→ticker 매핑 어댑터 과제로 남김).
+   - 신규 테이블 `security`(security_key PK, ticker, name, first_seen, is_priceable) + 도메인 엔티티/포트.
+2. **가격 스토어**: 신규 테이블 `security_price`(security_key, date, close, adj_close, volume) — `UNIQUE(security_key, date)`. **adj_close**(배당/분할 조정)를 수익률 계산의 기준으로 둔다. **벤치마크(QQQ)도 같은 스토어에 적재**해 초과수익 계산에 사용한다.
+3. **수집 어댑터**: `MarketDataProvider`를 재사용해 underlying 티커 배치 수집(yfinance). 수백~수천 종목 fan-out → 배치/스로틀/backoff, 이미 받은 구간 skip(증분).
+4. **파이프라인 훅**: 수집 시 "현재 분석 유니버스 ETF들의 최신 스냅샷에 등장하는 고유 underlying 집합"을 구해 가격을 갱신. `collect.py`에 `--with-underlying-prices` 단계 추가(분리 실행 가능).
+5. 보존정책: `security_price`는 분석 horizon(최대 60거래일)을 넉넉히 커버하도록 장기 보존(예: 2년+). 마이그레이션 `0007_security_price`.
 
 **완료 기준**
-- 서로 다른 날짜 2개 스냅샷으로 collect 2회 실행 시 `etf_holding_change`에 NEW/EXIT/INCREASE/DECREASE가 정확히 생성.
-- diff 엔진 단위 테스트(합성 픽스처: 신규/청산/증가/감소/이름폴백/현금제외/임계치) 통과.
-- 동일 입력 재실행 시 변동 행 멱등(중복 없음).
+- 분석 유니버스의 고유 보유 종목에 대해 일별 `adj_close`가 적재된다.
+- 재실행 시 증분만 수집(멱등). 수집 실패 종목은 격리·로깅되고 전체를 막지 않는다.
 
 ---
 
-### 단계 M4 — 백엔드 API (holdings·변동·종목 이력·전체 피드)
+## Phase D — 시그널 모델 (ETF 횡단 conviction 집계)
 
-**목표**: 프론트가 소비할 변동 추적 엔드포인트 완성.
+**목표**: 변동(`etf_holding_change`)을 **분석 가능한 시그널 이벤트**로 정규화하고, **여러 ETF가 같은 종목을 동시에 매집하는 강도(conviction)** 를 계산한다.
 
-**작업 항목 (엔드포인트)**
-1. `GET /api/etfs/{ticker}/holdings?date=` — 스냅샷(shares·market_value·weight + 직전 대비 `shares_delta`/`weight_delta`). `date` 생략 시 최신.
-2. `GET /api/etfs/{ticker}/holdings/dates` — 사용 가능한 스냅샷 날짜 목록.
-3. `GET /api/etfs/{ticker}/changes?date=` — 해당 스냅샷의 트레이드(기본 변동만, UNCHANGED 제외).
-4. `GET /api/etfs/{ticker}/positions/{holding}/history` — 한 종목의 shares·weight 시계열.
-5. `GET /api/changes/recent?types=&limit=` — 유니버스 전체 최신 트레이드 피드.
-6. `interfaces/api/changes.py` 신규 라우터 + `interfaces/api/etfs.py` 확장. **정적 경로를 `/{ticker}` 동적 경로보다 먼저 등록**(기존 `/compare` 패턴).
-7. `interfaces/schemas/`: `holding.py`에 shares/market_value/delta 추가, 신규 `change.py`(`HoldingChangeResponse`, `PositionHistoryPointResponse`).
-8. 서비스 단위 테스트: 인메모리 가짜 리포지토리로 검증(`tests/fakes.py` 확장).
-
-**완료 기준**
-- 위 엔드포인트가 `/docs`에서 동작. 데이터 없는 티커/날짜는 빈 배열 또는 404.
-- `/api/changes/recent`가 여러 ETF 트레이드를 최신순으로 반환.
-
----
-
-### 단계 M5 — 프론트: holdings 변동 UI + 종목 추세 + 전체 피드
-
-**목표**: 변동 추적 화면을 백엔드와 연결.
+**근거**: 단일 ETF의 매수보다, **복수의 독립 액티브 매니저가 동시에** 같은 종목을 늘리는 것이 더 강한 신호라는 게 핵심 가설의 요체다.
 
 **작업 항목**
-1. `lib/types.ts`/`lib/api.ts` 확장 + 훅: `useHoldings(ticker, date)`, `useHoldingChanges`, `usePositionHistory`, `useRecentChanges`.
-2. `app/etfs/[ticker]/page.tsx`: holdings 탭에 스냅샷 테이블 + **행별 변동 배지**(신규/청산/▲증가/▼감소, shares·weight Δ 표시), 스냅샷 날짜 피커. 종목 클릭 시 추세 차트.
-3. `components/HoldingsTable.tsx` 변동 배지 컬럼 추가, `components/PositionHistoryChart.tsx`(shares·weight 듀얼축, `PriceChart.tsx` 패턴 재사용), `components/ChangeFeed.tsx`.
-4. `app/changes/page.tsx`: 유니버스 전체 "최근 매매" 피드(ETF·종목·유형·Δ·날짜).
-5. 데이터 신선도(마지막 스냅샷 날짜) 배지 + 푸터에 "투자자문 아님" 면책 고지.
+1. 시그널 정의(도메인): `Signal(security_key, as_of_date, direction, ...)`.
+   - `direction` = BUY(shares↑ / NEW) vs SELL(shares↓ / EXIT).
+   - 크기 지표: `shares_delta_pct`, `weight_delta`, **달러 흐름**(`shares_delta × adj_close`).
+2. **횡단 집계**: 특정 날짜·종목에 대해 분석 유니버스 ETF들을 묶어
+   - `n_buying` / `n_selling`(매수·매도 ETF 수),
+   - `net_shares_flow`, `net_dollar_flow`,
+   - `conviction_score`(예: 매수 ETF 수 또는 순매수 비율 가중).
+3. 저장: 신규 테이블 `signal_daily`(security_key, as_of_date, n_buying, n_selling, net_flow, conviction_score, ...) — 평가/조회 가속용 머티리얼라이즈. 마이그레이션 `0008_signal_daily`. 순수 집계 로직은 `application/services/signal_service.py`(외부 의존 0, 단위 테스트 가능).
+4. API: `GET /api/signals/daily?date=`(그날의 컨빅션 상위 종목), `GET /api/signals/security/{security_key}`(한 종목의 시그널 이력 + 어떤 ETF들이 사는지).
 
 **완료 기준**
-- 상세에서 스냅샷 날짜 전환 시 변동 배지가 갱신.
-- 종목 클릭 시 shares·weight 추세 차트 표시.
-- `/changes`에서 전체 매매 피드 렌더, 행 클릭 시 해당 ETF 상세 이동.
+- 임의 날짜에 대해 "여러 ETF가 동시에 매집한 종목" 랭킹이 나온다.
+- 횡단 집계가 합성 픽스처 단위 테스트(2개 ETF가 같은 종목 매수 → conviction=2 등)를 통과한다.
 
 ---
 
-### 단계 M6 — 발행사 확장 · 스케줄러 · 운영 · 배포
+## Phase E — 평가 엔진 (Forward Return / Hit Rate / IC) — **분석의 핵심**
 
-**목표**: 유니버스 확대 + 정기 자동 수집 + Vercel/Oracle 배포.
+**목표**: 각 시그널 이후 underlying의 **forward 초과수익**을 계산하고, 시그널의 예측력을 **hit rate · 평균 초과수익 · Information Coefficient**로 측정한다.
+
+**근거**: 이 단계가 곧 최종 목표의 답("비중↑ 종목이 실제로 오르나?")을 산출한다.
+
+**방법론(설계 결정)**
+1. **이벤트**: 각 (security, as_of_date) BUY 시그널을 이벤트로 본다. 실행 시점은 **T+1 시가 인지 가능일**(look-ahead 방지).
+2. **Horizon**: H ∈ {1, 5, 20, 60} 거래일. 각 H에 대해 `adj_close` 기준 forward return.
+3. **초과수익**: `excess = stock_return(H) − benchmark_return(H)`. **1차 벤치마크 = QQQ 단일**(`config`의 `BENCHMARK_TICKER`, 기본 `QQQ`). 평가 엔진은 벤치마크를 파라미터로 받게 설계해 **나중에 SPY·모펀드 ETF·베타조정 등 비교 대상을 추가**해도 코드 변경 없이 확장 가능하게 둔다.
+4. **버킷팅/층화**: NEW vs INCREASE, conviction 레벨(1/2/3+), 크기 버킷(shares_delta_pct·달러흐름 분위), 모펀드 테마별.
+5. **지표**:
+   - **Hit rate**: 초과수익 > 0 비율.
+   - **평균/중앙값 초과수익** (H별 → 시간 감쇠 곡선).
+   - **IC**: 시그널 크기와 forward 초과수익의 순위상관(Spearman).
+6. **편향 점검**: 생존편향(EXIT/상장폐지 포함 시도), creation/redemption 오염(절대 shares 대신 % 변화·달러흐름·conviction으로 완화), 표본 부족(초기엔 신뢰구간 넓음 → 표본수 함께 표기), 다중검정 주의.
 
 **작업 항목**
-1. `infrastructure/external/holdings/`에 발행사별 어댑터 점진 추가(CSV/XLS/XLSX/JSON/HTML embedded data 멀티포맷), registry 등록. 준투명 ETF는 `discloses_daily=False`로 분류해 diff 제외. 1차 레퍼런스: ARK CSV, BlackRock/iShares DYNF product-data JSON(legacy CSV+preamble parser 포함), State Street/SPDR TOTL XLSX, Capital Group CGGR/CGDV 공식 XLSX, T. Rowe Price TCAF embedded JSON, Avantis AVUV/AVDV embedded `etfHoldings`, Virtus PFFA legacy XLS.
-2. `infrastructure/scheduler/jobs.py`: APScheduler로 매일 1회(UTC, 미국장 마감 후) collect 등록, `main.py` lifespan에서 start/shutdown.
-3. `interfaces/api/admin.py`: `POST /api/admin/collect`(수동 트리거), `GET /api/admin/runs`(수집 로그) — `ADMIN_TOKEN` 보호(`secrets.compare_digest`).
-4. 컨트랙트 테스트(SQLite)로 HoldingRepository 스냅샷/이전/이력 쿼리 검증. 백엔드 배포 = **Oracle Cloud Always Free**(ARM `linux/arm64` 빌드, VCN 보안목록 + OS 방화벽 둘 다 개방, Caddy 자동 HTTPS), 프론트 = **Vercel**(`NEXT_PUBLIC_API_BASE_URL`), 백엔드 CORS에 Vercel 도메인 등록. 운영 compose는 `API_DOMAIN` 기반 Caddy reverse proxy를 포함한다.
-5. `README.md`에 수집/배포/환경변수 문서화.
+1. `application/services/evaluation_service.py`: 순수 함수형 평가(가격·시그널 픽스처만으로 단위 테스트). forward return·excess·hit·IC 계산.
+2. 캐시 테이블(선택) `signal_outcome`(signal 식별 + H별 excess return) — 무거운 재계산 회피. 마이그레이션 `0009_signal_outcome`.
+3. API:
+   - `GET /api/analysis/performance?bucket=&horizon=` — 버킷·horizon별 hit rate·평균 초과수익·표본수·IC(요약 통계).
+   - `GET /api/analysis/security/{security_key}` — 한 종목의 과거 BUY 시그널 점들에 실제 forward 수익을 오버레이.
+4. 배치: 평가 산출을 수집 파이프라인 끝 또는 별도 admin 트리거(`POST /api/admin/recompute-analysis`)로 갱신.
 
 **완료 기준**
-- 스케줄러 등록 확인, 수동 트리거로 전체 파이프라인(holdings+diff) 1회 성공.
-- 운영: Vercel 프론트가 Oracle VM API(HTTPS/CORS)로 실데이터 표시.
-- `GET /api/admin/runs`로 수집 이력(partial 포함) 확인.
+- "conviction≥2 BUY 시그널의 20거래일 평균 초과수익 = X%, hit rate = Y%, n = Z" 형태의 표가 API로 나온다.
+- 합성 데이터(상승하도록 만든 종목 + 시그널)로 평가 엔진이 양의 초과수익·높은 hit rate를 정확히 산출(단위 테스트).
+- look-ahead 차단(공시일 당일·이전 가격이 forward 계산에 절대 안 들어감)이 테스트로 보장된다.
 
 ---
 
-## 4. 환경 변수 (.env.example)
+## Phase F — 분석 UI (모바일)
 
-```bash
-# backend
-DATABASE_URL=sqlite+aiosqlite:///./quantbot.db   # 또는 postgresql+asyncpg://...
-COLLECT_CRON_HOUR=22                              # UTC 기준 일일 수집 시각(미국장 마감 후)
-HOLDINGS_HTTP_TIMEOUT=30                          # 발행사 CSV 다운로드 타임아웃(초)
-ADMIN_TOKEN=change-me                             # /api/admin 보호용
-CORS_ORIGINS=http://localhost:3000,https://<your-app>.vercel.app
-FMP_API_KEY=                                      # (선택) 프로필/AUM 보강용, 없어도 동작
+**목표**: 평가 결과를 모바일에서 직관적으로 보여준다.
 
-# frontend (Vercel 환경변수)
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000     # 운영: https://api.<도메인>
-```
+**작업 항목**
+1. **시그널 성과 화면**(`app/analysis/page.tsx`): horizon 토글 + 버킷별 hit rate / 평균 초과수익 / 표본수 / IC 카드·막대.
+2. **컨빅션 보드**(`app/signals/page.tsx` 또는 변동피드 통합): "오늘 여러 ETF가 동시에 매집 중인 종목" 랭킹, 각 종목에 누가 사는지.
+3. **종목 상세**: 한 종목의 시그널 점 + 이후 실제 가격 궤적 오버레이(시그널이 맞았는지 시각적으로). `PositionHistoryChart` 확장.
+4. 면책: "백테스트 결과이며 투자자문이 아님 / 과거 성과가 미래를 보장하지 않음 / creation·redemption 오염 가능" 고지를 분석 화면에 명시.
+
+**완료 기준**
+- 모바일에서 "시그널이 실제로 통했는가"를 한 화면에서 읽을 수 있다.
+- 표본수·신뢰 경고가 함께 표기된다.
 
 ---
 
-## 5. 주요 리스크 & 대응
+## Phase G — (선택) 페이퍼 포트폴리오 백테스트
+
+**목표**: 규칙 기반 가상 포트폴리오(예: 매일 conviction 상위 N 종목 동일가중 매수, 20거래일 보유)의 **누적 초과수익 곡선**을 산출해 시그널을 제품 서사로 만든다.
+
+**작업 항목**: `evaluation_service`에 포트폴리오 시뮬레이터(거래비용·슬리피지 가정 명시), `GET /api/analysis/backtest`, 모바일 누적수익 차트.
+
+**완료 기준**: 벤치마크 대비 누적 곡선 + 요약(연환산 초과수익, MDD, 표본기간)이 나온다. 거래비용 가정이 문서화된다.
+
+---
+
+## 7. 결정 사항
+
+**확정**
+1. **거래소 정책**: 주요 거래소(NASDAQ·NYSE Arca·Cboe BZX 등) + 규모 절충. "나스닥 한정" 폐기. → `SIGNAL_EXCHANGES` 화이트리스트.
+2. **AUM 임계값**: `SIGNAL_MIN_AUM = 100_000_000` ($100M, env 조정).
+3. **벤치마크**: **1차 QQQ 단일**(`BENCHMARK_TICKER=QQQ`). 평가 엔진은 벤치마크 파라미터화 → 추후 SPY·모펀드별·베타조정 추가.
+
+**잠정(후속 확정)**
+4. **모바일 범위**: 모바일폭 고정(`max-w-[480px]`) + PWA 권장. 데스크톱은 모바일폭으로 렌더.
+5. **forward 실행 가격**: T+1 종가 기준(잠정). T+1 시가 옵션은 Phase E에서 비교.
+
+---
+
+## 8. 리스크 & 대응
 
 | 리스크 | 대응 |
 |---|---|
-| 발행사별 CSV/XLSX/JSON 포맷 드리프트/커버리지(광범위 유니버스 = 다수 파서) | registry + graceful skip, 어댑터별 파싱 테스트, per-ETF 에러 로깅으로 격리 |
-| 종목 매칭(채권/현금은 holding_ticker 없음) | `holding_key`로 이름 폴백 + 현금/노이즈 제외 |
-| 준투명(ANT) ETF는 일별 미공시 | `discloses_daily=False`로 분류, diff 대상 제외 |
-| 과거 이력 백필 불가(diff는 스냅샷 ≥2 필요) | 수집 시작 시점부터 누적. 발행사 아카이브 있으면 별도 백필 어댑터로 보강 |
-| shares 변동에 설정/환매(creation/redemption) 혼입 | 실제 매매와 유닛 증감이 섞일 수 있음 → weight_delta(배분 변화)를 보조지표로 병기, 문서에 nuance 명시 |
-| 펀드별 URL/다운로드 엔드포인트 변경 | 라이브 URL 검증 후 ticker→URL 하드코딩 맵 갱신, 미지원/변경 ticker는 graceful skip |
-| 발행사별 현금/파생/FX 토큰 차이 | base 정규화 + 어댑터별 제외 규칙 + fixture 테스트로 흡수 |
-| 발행사 holdings 요청 차단/rate-limit | with_backoff, 수집 간 sleep, User-Agent 설정, 실패 시 다음 배치 재시도 |
-| SQLite → Postgres 전환 | 헥사고날 포트로 DB 격리 + DATABASE_URL 교체 + 계약 테스트(1.5장) |
-| Oracle 무료 VM 포트 차단 | VCN 보안목록 **그리고** OS 방화벽(ufw/iptables) 둘 다 개방 |
-| Oracle ARM(A1) 아키텍처 | Docker 이미지 `linux/arm64` 빌드/검증, 네이티브 휠 호환 확인 |
-| 프론트(Vercel)→백엔드(Oracle) 통신 | 백엔드 HTTPS(Caddy 자동 TLS) + CORS에 Vercel 도메인 등록 |
+| underlying 가격 fan-out 비용·rate limit (수천 종목) | 증분 수집 + 배치/스로틀/backoff, 분석 유니버스로 모집단 축소, 실패 격리 |
+| CUSIP/ISIN만 있고 ticker 없는 보유 | 1차는 ticker 보유 행만 분석, CUSIP→ticker 매핑은 후속 과제로 분리 |
+| creation/redemption이 shares Δ에 오염 | %변화·달러흐름·conviction(ETF 수) 중심 평가, 절대 shares 단독 의존 회피, 면책 명시 |
+| look-ahead / 생존 편향 | 공시 인지일(T+1) 이후 가격만 사용 + 테스트로 강제, EXIT/폐지 종목 포함 시도 |
+| 초기 표본 부족 → 과적합/허위 유의 | 표본수·신뢰구간 병기, 다중검정 경고, horizon·버킷 사전 등록 |
+| "나스닥 상장" 모집단이 과소 | Phase B에서 실제 거래소 조사 후 정책 절충(§7-1) |
+| 상승장 편향(raw return 착시) | 항상 벤치마크 대비 초과수익으로 평가 |
+| 모바일 차트 가독성 | Recharts 모바일 프리셋, 핵심 1–2지표만, 카드화 |
 
 ---
 
-## 6. 구현 순서 요약 (체크리스트)
+## 9. 진행 체크리스트
 
-- [x] M1 스키마·도메인 확장: shares/market_value + HoldingChange + 마이그레이션 0002
-- [x] M2 HoldingsProvider 포트 + ARK CSV 어댑터 + registry
-- [x] M3 diff 엔진 + 변동 저장 + collect.py 개편
-- [x] M4 백엔드 API (holdings/changes/positions history/recent feed)
-- [x] M5 프론트 변동 UI + 종목 추세 차트 + 전체 피드 + 면책 고지
-- [x] M6a 발행사 어댑터 확장(멀티포맷 base + iShares DYNF + SPDR TOTL + Capital Group CGGR/CGDV + T. Rowe Price TCAF)
-- [x] M6b 스케줄러 + admin + Oracle/Caddy 배포 설정 + 운영 문서
-- [ ] M6c 실제 운영 배포 및 Vercel 연결 검증
+- [x] A. 모바일 전용 UI 전환 (셸/하단탭/카드화/PWA/모바일 E2E) — + Pretendard Variable 폰트, holdings 브라우저(필터칩·정렬·검색·더보기), 선택 종목 차트를 목록 위로 배치
+- [ ] B. 유니버스 정제 (거래소·AUM 메타 + 게이팅) — **거래소 실태 조사 선행**
+- [ ] C. Underlying security master + 가격 스토어(adj_close)
+- [ ] D. 시그널 모델 + ETF 횡단 conviction 집계
+- [ ] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단
+- [ ] F. 분석 UI (성과 화면 / 컨빅션 보드 / 종목 시그널 오버레이)
+- [ ] G. (선택) 페이퍼 포트폴리오 백테스트
 
-> 각 단계의 **완료 기준**을 만족하면 다음 단계로 진행한다. 단계는 독립적 PR/커밋 단위가 될 수 있다.
-> **핵심 불변식**: 실제 매매 판정은 항상 shares Δ 기준. 비중%는 가격 드리프트가 섞이므로 보조지표로만 사용한다.
+> **핵심 불변식**: 시그널은 shares Δ로 정의하고, 평가는 항상 **벤치마크 대비 초과수익**으로, **공시 인지일 이후 가격**으로만 한다.

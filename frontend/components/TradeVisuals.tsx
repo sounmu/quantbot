@@ -9,32 +9,42 @@ type BadgeTone = {
   dot: string;
 };
 
+// 색 관습(데이터 콘솔: 옅은 틴트 + 같은 색 글씨). 신규=그린, 증가=빨강, 감소=파랑, 청산=중립 그레이.
 const BADGE_TONES: Record<ChangeType, BadgeTone> = {
   NEW: {
     label: "신규",
-    className: "bg-cobalt/10 text-cobalt ring-cobalt/15",
-    dot: "bg-cobalt"
+    className: "bg-lime text-gain ring-gain/15",
+    dot: "bg-gain"
   },
   EXIT: {
     label: "청산",
     className: "bg-ink/[0.06] text-ink ring-ink/10",
-    dot: "bg-ink"
+    dot: "bg-ink/40"
   },
   INCREASE: {
     label: "증가",
-    className: "bg-accent/10 text-accent ring-accent/15",
-    dot: "bg-accent"
+    className: "bg-rise/10 text-rise ring-rise/15",
+    dot: "bg-rise"
   },
   DECREASE: {
     label: "감소",
-    className: "bg-berry/10 text-berry ring-berry/15",
-    dot: "bg-berry"
+    className: "bg-fall/10 text-fall ring-fall/15",
+    dot: "bg-fall"
   },
   UNCHANGED: {
     label: "유지",
     className: "bg-panel text-muted ring-line",
     dot: "bg-muted/50"
   }
+};
+
+// 타임라인/마커용 점 색 (단일 출처). 신규=그린, 매수=빨강, 매도/청산=파랑, 유지=회색.
+export const CHANGE_DOT: Record<ChangeType, string> = {
+  NEW: "bg-gain",
+  INCREASE: "bg-rise",
+  DECREASE: "bg-fall",
+  EXIT: "bg-ink/40",
+  UNCHANGED: "bg-muted/50"
 };
 
 export function ChangeBadge({
@@ -69,7 +79,7 @@ export function DeltaValue({ value, suffix }: { value: number | null; suffix: st
 
   const isPositive = value > 0;
   const isNegative = value < 0;
-  const className = isPositive ? "text-accent" : isNegative ? "text-berry" : "text-muted";
+  const className = isPositive ? "text-rise" : isNegative ? "text-fall" : "text-muted";
   const Icon = isPositive ? ArrowUpRight : isNegative ? ArrowDownRight : Minus;
   const decimals = suffix === "%" ? 2 : Number.isInteger(value) ? 0 : 4;
   const formatted = value.toLocaleString(undefined, {
@@ -78,7 +88,7 @@ export function DeltaValue({ value, suffix }: { value: number | null; suffix: st
   });
 
   return (
-    <span className={`inline-flex items-center justify-end gap-1 whitespace-nowrap font-medium ${className}`}>
+    <span className={`inline-flex items-center justify-end gap-1 whitespace-nowrap font-semibold tabular-nums ${className}`}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       <span>
         {isPositive ? "+" : ""}

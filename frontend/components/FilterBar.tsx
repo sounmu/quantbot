@@ -12,18 +12,18 @@ type Props = {
 
 export function FilterBar({ query, issuers, themes, onChange }: Props) {
   return (
-    <div className="grid gap-3 rounded-lg border border-line bg-white p-3 shadow-soft md:grid-cols-[minmax(220px,1fr)_180px_180px_180px_120px]">
+    <div className="grid gap-2 rounded-lg border border-line bg-surface p-3">
       <label className="relative block">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
         <input
-          className="h-10 w-full rounded-md border border-line bg-white pl-9 pr-3 text-sm text-ink"
+          className="h-11 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-faint focus:border-brand/50"
           value={query.q ?? ""}
           onChange={(event) => onChange({ ...query, q: event.target.value, page: 1 })}
           placeholder="티커 또는 이름"
         />
       </label>
       <select
-        className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
         value={query.issuer ?? ""}
         onChange={(event) => onChange({ ...query, issuer: event.target.value, page: 1 })}
       >
@@ -35,7 +35,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         ))}
       </select>
       <select
-        className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
         value={query.theme ?? ""}
         onChange={(event) => onChange({ ...query, theme: event.target.value, page: 1 })}
       >
@@ -47,7 +47,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         ))}
       </select>
       <select
-        className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
         value={query.sort ?? "name"}
         onChange={(event) =>
           onChange({ ...query, sort: event.target.value as EtfQuery["sort"], page: 1 })
@@ -59,7 +59,7 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
         <option value="return_1y">1Y 수익률</option>
       </select>
       <select
-        className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink"
+        className="h-11 rounded-lg border border-line bg-surface px-3 text-sm text-body"
         value={query.order ?? "asc"}
         onChange={(event) =>
           onChange({ ...query, order: event.target.value as EtfQuery["order"], page: 1 })
@@ -71,4 +71,3 @@ export function FilterBar({ query, issuers, themes, onChange }: Props) {
     </div>
   );
 }
-

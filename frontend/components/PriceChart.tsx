@@ -2,14 +2,17 @@
 
 import { useMemo, useState } from "react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { AreaGradient, fillId, makeEndDot } from "@/components/chartHelpers";
+import { useChartPalette } from "@/components/ThemeProvider";
 import type { PricePoint } from "@/lib/types";
 
 type ChartMode = "price" | "return";
@@ -21,9 +24,9 @@ const MOVING_AVERAGES: Array<{
   period: number;
   color: string;
 }> = [
-  { key: "ma20", label: "MA20", period: 20, color: "#0f766e" },
-  { key: "ma50", label: "MA50", period: 50, color: "#be185d" },
-  { key: "ma200", label: "MA200", period: 200, color: "#ea580c" }
+  { key: "ma20", label: "MA20", period: 20, color: "#0d9488" },
+  { key: "ma50", label: "MA50", period: 50, color: "#d6336c" },
+  { key: "ma200", label: "MA200", period: 200, color: "#f59e0b" }
 ];
 
 export function PriceChart({ prices }: { prices: PricePoint[] }) {
@@ -31,22 +34,23 @@ export function PriceChart({ prices }: { prices: PricePoint[] }) {
   const [enabledAverages, setEnabledAverages] = useState<MovingAverageKey[]>(["ma20", "ma50"]);
   const chartData = useMemo(() => enrichPrices(prices), [prices]);
   const primaryKey = mode === "price" ? "close" : "closeReturn";
+  const palette = useChartPalette();
 
   return (
-    <div className="rounded-lg border border-line bg-white p-4 shadow-soft">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex w-fit rounded-md border border-line bg-panel p-1">
+    <div className="rounded-lg border border-line bg-surface p-4">
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="grid grid-cols-2 rounded-lg bg-panel p-1">
           <button
-            className={`h-8 rounded px-3 text-xs font-medium ${
-              mode === "price" ? "bg-ink text-white" : "text-muted hover:bg-white"
+            className={`h-10 rounded-md px-3 text-xs font-semibold transition ${
+              mode === "price" ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-body"
             }`}
             onClick={() => setMode("price")}
           >
             가격
           </button>
           <button
-            className={`h-8 rounded px-3 text-xs font-medium ${
-              mode === "return" ? "bg-ink text-white" : "text-muted hover:bg-white"
+            className={`h-10 rounded-md px-3 text-xs font-semibold transition ${
+              mode === "return" ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-body"
             }`}
             onClick={() => setMode("return")}
           >
@@ -58,10 +62,10 @@ export function PriceChart({ prices }: { prices: PricePoint[] }) {
           {MOVING_AVERAGES.map((average) => (
             <label
               key={average.key}
-              className="inline-flex h-8 items-center gap-2 rounded-md border border-line bg-white px-3 text-xs font-medium text-ink"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-body"
             >
               <input
-                className="h-3.5 w-3.5 accent-accent"
+                className="h-3.5 w-3.5 accent-brand"
                 type="checkbox"
                 checked={enabledAverages.includes(average.key)}
                 onChange={() => {
@@ -79,34 +83,41 @@ export function PriceChart({ prices }: { prices: PricePoint[] }) {
       </div>
 
       {chartData.length === 0 ? (
-        <div className="flex h-[320px] items-center justify-center text-sm text-muted">
+        <div className="flex h-[260px] items-center justify-center text-sm text-muted">
           가격 데이터 없음
         </div>
       ) : (
-        <div className="h-[320px]">
+        <div className="h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 8, right: 18, left: 0, bottom: 8 }}>
-              <CartesianGrid stroke="#d7dee8" strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={28} />
+            <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
+              <defs>
+                <AreaGradient id={fillId("price")} color={palette.line} />
+              </defs>
+              <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: palette.tick }} stroke={palette.axis} minTickGap={22} />
               <YAxis
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 11, fill: palette.tick }}
+                stroke={palette.axis}
                 domain={["auto", "auto"]}
                 unit={mode === "return" ? "%" : undefined}
-                width={58}
+                width={54}
               />
               <Tooltip
+                contentStyle={palette.tooltip}
                 formatter={(value, name) => [
                   formatTooltip(value === null ? null : Number(value), mode),
                   String(name)
                 ]}
               />
-              <Line
+              <Area
                 type="monotone"
                 dataKey={primaryKey}
                 name={mode === "price" ? "종가" : "수익률"}
-                stroke="#2563eb"
+                stroke={palette.line}
                 strokeWidth={2}
-                dot={false}
+                fill={`url(#${fillId("price")})`}
+                dot={makeEndDot(chartData.length, palette.line)}
+                activeDot={{ r: 4 }}
               />
               {MOVING_AVERAGES.filter((average) => enabledAverages.includes(average.key)).map(
                 (average) => (
@@ -122,7 +133,7 @@ export function PriceChart({ prices }: { prices: PricePoint[] }) {
                   />
                 )
               )}
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}

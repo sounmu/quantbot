@@ -59,53 +59,52 @@ export default function EtfDetailPage() {
   return (
     <AppShell>
       <div className="mb-5">
-        <Link className="inline-flex items-center gap-2 text-sm text-muted hover:text-ink" href="/etfs">
+        <Link className="inline-flex min-h-11 items-center gap-2 text-sm text-muted hover:text-ink" href="/etfs">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           목록
         </Link>
       </div>
 
-      <div className="mb-5 rounded-lg border border-line bg-white p-5 shadow-soft">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-semibold text-ink">{ticker}</h1>
-              <button
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-panel hover:text-berry"
-                onClick={() => watchlist.toggle(ticker)}
-                title="관심목록"
-                aria-label={watchlist.has(ticker) ? "관심목록에서 제거" : "관심목록에 추가"}
-                aria-pressed={watchlist.has(ticker)}
-              >
-                <Star
-                  className="h-5 w-5"
-                  fill={watchlist.has(ticker) ? "currentColor" : "none"}
-                  aria-hidden="true"
-                />
-              </button>
-            </div>
-            <p className="mt-1 max-w-3xl text-sm text-muted">
+      <section className="mb-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-bold leading-none tracking-tight text-ink">{ticker}</h1>
+            <p className="mt-2 break-words text-sm leading-snug text-muted">
               {detail.data?.name ?? (detail.isLoading ? "불러오는 중" : "ETF 정보 없음")}
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-            <Stat label="운용사" value={detail.data?.issuer ?? "-"} />
-            <Stat label="테마" value={detail.data?.theme ?? "-"} />
-            <Stat label="보수율" value={formatPercent(detail.data?.expense_ratio ?? null)} />
-            <Stat label="공시" value={detail.data?.discloses_daily ? "일별" : "미지원"} />
-          </div>
+          <button
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-faint transition hover:bg-panel hover:text-berry"
+            onClick={() => watchlist.toggle(ticker)}
+            title="관심목록"
+            aria-label={watchlist.has(ticker) ? "관심목록에서 제거" : "관심목록에 추가"}
+            aria-pressed={watchlist.has(ticker)}
+          >
+            <Star
+              className="h-5 w-5"
+              fill={watchlist.has(ticker) ? "currentColor" : "none"}
+              aria-hidden="true"
+            />
+          </button>
         </div>
-      </div>
 
-      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <Stat label="운용사" value={detail.data?.issuer ?? "-"} />
+          <Stat label="테마" value={detail.data?.theme ?? "-"} />
+          <Stat label="보수율" value={formatPercent(detail.data?.expense_ratio ?? null)} />
+          <Stat label="공시" value={detail.data?.discloses_daily ? "일별" : "미지원"} />
+        </div>
+      </section>
+
+      <div className="mb-3 space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-ink">보유 종목 스냅샷</h2>
+          <h2 className="text-lg font-bold tracking-tight text-ink">보유 종목 스냅샷</h2>
           <p className="mt-1 text-sm text-muted">
             주식수 Δ 기준으로 실제 매매 방향을 판정하고, 비중 Δ는 보조 지표로 표시합니다.
           </p>
         </div>
         <select
-          className="h-10 rounded-md border border-line bg-white px-3 text-sm text-ink"
+          className="h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm tabular-nums text-body"
           value={snapshotDate ?? ""}
           onChange={(event) => {
             setSnapshotDate(event.target.value || undefined);
@@ -121,7 +120,12 @@ export default function EtfDetailPage() {
         </select>
       </div>
 
-      <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="space-y-4">
+        <PositionHistoryChart
+          points={positionHistory.data ?? []}
+          label={selectedPositionLabel}
+          isLoading={positionHistory.isLoading}
+        />
         <HoldingsTable
           holdings={holdings.data ?? []}
           isLoading={holdings.isLoading}
@@ -132,30 +136,29 @@ export default function EtfDetailPage() {
             setSelectedPositionLabel(label);
           }}
         />
-        <PositionHistoryChart
-          points={positionHistory.data ?? []}
-          label={selectedPositionLabel}
-          isLoading={positionHistory.isLoading}
-        />
       </div>
 
       <div className="mt-6">
-        <h2 className="mb-3 text-lg font-semibold text-ink">스냅샷 변동 피드</h2>
+        <h2 className="mb-3 text-lg font-bold tracking-tight text-ink">스냅샷 변동 피드</h2>
         <ChangeFeed
           changes={holdingChanges.data ?? []}
           isLoading={holdingChanges.isLoading}
           errorMessage={holdingChanges.isError ? "스냅샷 변동 데이터를 불러오지 못했습니다." : undefined}
+          initialVisibleCount={5}
+          visibleStep={5}
         />
       </div>
 
-      <div className="mb-3 mt-6 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-ink">가격 컨텍스트</h2>
-        <div className="flex rounded-md border border-line bg-white p-1">
+      <div className="mb-3 mt-6 space-y-3">
+        <h2 className="text-lg font-bold tracking-tight text-ink">가격 컨텍스트</h2>
+        <div className="flex gap-1 rounded-lg bg-panel p-1">
           {RANGES.map((item) => (
             <button
               key={item}
-              className={`h-8 min-w-12 rounded px-3 text-xs font-medium ${
-                range === item ? "bg-ink text-white" : "text-muted hover:bg-panel"
+              type="button"
+              aria-pressed={range === item}
+              className={`h-10 flex-1 rounded-md text-xs font-semibold transition ${
+                range === item ? "bg-surface text-ink shadow-soft" : "text-muted hover:text-body"
               }`}
               onClick={() => setRange(item)}
             >
@@ -175,9 +178,9 @@ export default function EtfDetailPage() {
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="min-w-28 rounded-md border border-line bg-panel px-3 py-2">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-ink">{value}</div>
+    <div className="min-w-0 rounded-lg bg-panel px-3 py-2.5">
+      <div className="text-[11px] text-faint">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
     </div>
   );
 }

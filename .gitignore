@@ -22,3 +22,4 @@ playwright-report/
 # 내부 문서는 깃에 올리지 않는다
 docs/
 CLAUDE.md
+AGENTS.md

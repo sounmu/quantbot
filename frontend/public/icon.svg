@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Quantbot">
+  <rect width="512" height="512" rx="112" fill="#D3FFD9"/>
+  <path d="M128 334h256" stroke="#0f766e" stroke-width="34" stroke-linecap="round"/>
+  <path d="M152 286l72-72 58 58 82-104" fill="none" stroke="#0f766e" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="152" cy="286" r="22" fill="#0f766e"/>
+  <circle cx="224" cy="214" r="22" fill="#0f766e"/>
+  <circle cx="282" cy="272" r="22" fill="#0f766e"/>
+  <circle cx="364" cy="168" r="22" fill="#0f766e"/>
+</svg>

@@ -110,6 +110,24 @@ const SEEDED = {
       shares_before: 0, shares_after: 2814677, shares_delta: 2814677,
       shares_delta_pct: null, weight_before: 0, weight_after: 6.57, weight_delta: 6.57,
     },
+    {
+      ticker: "DYNF", as_of_date: "2026-06-24", prev_date: "2026-06-23",
+      holding_ticker: "AMZN", holding_name: "AMAZON COM INC", change_type: "INCREASE",
+      shares_before: 5000000, shares_after: 5100000, shares_delta: 100000,
+      shares_delta_pct: 2, weight_before: 3.1, weight_after: 3.22, weight_delta: 0.12,
+    },
+    {
+      ticker: "DYNF", as_of_date: "2026-06-24", prev_date: "2026-06-23",
+      holding_ticker: "GOOGL", holding_name: "ALPHABET INC", change_type: "DECREASE",
+      shares_before: 4200000, shares_after: 4100000, shares_delta: -100000,
+      shares_delta_pct: -2.38, weight_before: 2.9, weight_after: 2.81, weight_delta: -0.09,
+    },
+    {
+      ticker: "DYNF", as_of_date: "2026-06-24", prev_date: "2026-06-23",
+      holding_ticker: "JPM", holding_name: "JPMORGAN CHASE & CO", change_type: "NEW",
+      shares_before: 0, shares_after: 900000, shares_delta: 900000,
+      shares_delta_pct: null, weight_before: 0, weight_after: 1.14, weight_delta: 1.14,
+    },
   ],
 
   recentChanges: [

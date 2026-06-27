@@ -1,0 +1,18 @@
+{
+  "name": "Quantbot",
+  "short_name": "Quantbot",
+  "description": "Transparent active ETF holdings tracker",
+  "start_url": "/etfs",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#f8fafc",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

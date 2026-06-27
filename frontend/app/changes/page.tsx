@@ -10,8 +10,8 @@ export default function ChangesPage() {
   return (
     <AppShell>
       <div className="mb-5">
-        <h1 className="text-2xl font-semibold text-ink">최근 매매 피드</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-2xl font-bold leading-tight tracking-tight text-ink">최근 매매 피드</h1>
+        <p className="mt-2 text-sm leading-snug text-muted">
           추적 중인 ETF 전체에서 주식수 Δ로 판정한 신규, 청산, 증가, 감소 내역입니다.
         </p>
       </div>

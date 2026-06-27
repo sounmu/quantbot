@@ -17,7 +17,7 @@
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
 - APScheduler 기반 일일 자동 수집과 admin 수동 수집 API
 - ETF별 holdings 날짜, 스냅샷, 변동, 종목 이력, 전체 최근 매매 피드 API
-- Next.js App Router 프론트: ETF 목록, 상세 holdings diff, 종목 이력 차트, 전체 최근 매매 피드, 가격 컨텍스트, 비교 화면
+- Next.js App Router 프론트: 모바일 고정폭 PWA 셸, 하단 탭, ETF/holdings/최근 매매 카드, shares 증가 분석 보드, 가격/비교 차트, 라이트/다크 모드 토글
 
 ## 아키텍처 규칙
 
@@ -94,6 +94,7 @@ curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: $ADMIN_TOKEN"
 ```bash
 cd frontend
 npm install
+npx playwright install chromium
 npm run dev
 ```
 

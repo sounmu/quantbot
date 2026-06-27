@@ -30,17 +30,17 @@ export default function EtfsPage() {
 
   return (
     <AppShell>
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">해외 액티브 ETF</h1>
-          <p className="mt-1 text-sm text-muted">추적 대상으로 등록된 액티브 ETF 목록</p>
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold leading-tight tracking-tight text-ink">해외 액티브 ETF</h1>
+          <p className="mt-1 text-sm text-muted">공식 holdings 공시 추적 목록</p>
         </div>
         <Link
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-medium text-white hover:bg-slate-700"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-3.5 text-sm font-semibold text-white transition hover:bg-brand/90"
           href="/compare"
         >
           <GitCompare className="h-4 w-4" aria-hidden="true" />
-          비교 {watchlist.tickers.length > 0 ? watchlist.tickers.length : ""}
+          비교 {watchlist.tickers.length > 0 ? <span className="tabular-nums">{watchlist.tickers.length}</span> : ""}
         </Link>
       </div>
 
@@ -59,12 +59,12 @@ export default function EtfsPage() {
         />
 
         <div className="flex items-center justify-between text-sm text-muted">
-          <span>
+          <span className="tabular-nums">
             총 {total.toLocaleString()}개 중 {page} / {maxPage}
           </span>
           <div className="flex items-center gap-2">
             <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-white text-ink disabled:opacity-40"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface text-body transition hover:border-line-strong disabled:opacity-40"
               disabled={page <= 1}
               onClick={() => setQuery((current) => ({ ...current, page: page - 1 }))}
               title="이전"
@@ -72,7 +72,7 @@ export default function EtfsPage() {
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-line bg-white text-ink disabled:opacity-40"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-surface text-body transition hover:border-line-strong disabled:opacity-40"
               disabled={page >= maxPage}
               onClick={() => setQuery((current) => ({ ...current, page: page + 1 }))}
               title="다음"

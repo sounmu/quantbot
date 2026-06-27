@@ -1,19 +1,80 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui,
+    "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+
+  /* 색상 토큰(RGB 채널). tailwind는 rgb(var(--x) / a) 로 참조한다. */
+  --ink: 22 24 29;
+  --body: 63 68 76;
+  --muted: 107 114 128;
+  --faint: 154 161 171;
+  --canvas: 231 233 238;
+  --surface: 255 255 255;
+  --panel: 246 247 249;
+  --line: 230 232 236;
+  --line-strong: 212 216 223;
+  --hair: 238 240 243;
+  --brand: 79 70 229;
+  --brand-soft: 238 240 254;
+  --berry: 214 51 108;
+  --rise: 224 50 47;
+  --fall: 47 106 224;
+  --gain: 22 163 74;
+  --lime: 220 252 231;
+}
+
+.dark {
+  color-scheme: dark;
+  /* 다크: 근블랙 네이비 표면 + 채도 올린 의미색(핀테크 표준 톤) */
+  --ink: 243 245 248;
+  --body: 194 199 208;
+  --muted: 139 146 158;
+  --faint: 100 107 120;
+  --canvas: 8 10 14;
+  --surface: 20 22 28;
+  --panel: 28 31 39;
+  --line: 38 42 51;
+  --line-strong: 53 59 70;
+  --hair: 32 36 44;
+  --brand: 124 132 255;
+  --brand-soft: 32 35 66;
+  --berry: 240 88 140;
+  --rise: 255 99 92;
+  --fall: 96 144 255;
+  --gain: 52 211 124;
+  --lime: 16 46 30;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
-  background: #eef2f6;
-  color: #17212b;
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 금융 수치는 고정폭 숫자로 정렬을 안정화한다 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 button,
@@ -22,11 +83,17 @@ select {
   font: inherit;
 }
 
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid rgb(var(--brand));
   outline-offset: 2px;
 }
-
