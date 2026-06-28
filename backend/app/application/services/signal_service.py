@@ -62,6 +62,19 @@ class SignalService:
     ) -> list[SignalDaily]:
         return await self._signals.daily(as_of_date=as_of_date, limit=limit)
 
+    async def cross_signals(
+        self,
+        security_keys: list[str],
+        *,
+        as_of_date: date,
+    ) -> dict[str, SignalDaily]:
+        """Return the cross-ETF daily signal for each security on a given date.
+
+        Used to annotate one ETF's holdings with "how many other ETFs traded the
+        same security that day" — distinguishing a lone bet from a consensus.
+        """
+        return await self._signals.for_securities_on_date(security_keys, as_of_date)
+
     async def for_security(
         self,
         security_key: str,

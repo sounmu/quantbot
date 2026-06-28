@@ -150,7 +150,7 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 - `GET /health`
 - `GET /api/etfs` — `exchange`, `aum`, `in_signal_universe` 포함
 - `GET /api/etfs/{ticker}` — `exchange`, `aum`, `in_signal_universe` 포함
-- `GET /api/etfs/{ticker}/holdings?date=YYYY-MM-DD`
+- `GET /api/etfs/{ticker}/holdings?date=YYYY-MM-DD` — 각 보유종목에 교차 시그널(`signal_n_buying`/`signal_n_selling`/`signal_conviction`: 같은 날 같은 종목을 매매한 시그널 ETF 수) 포함
 - `GET /api/etfs/{ticker}/holdings/dates`
 - `GET /api/etfs/{ticker}/changes?date=YYYY-MM-DD`
 - `GET /api/etfs/{ticker}/positions/{holding}/history`

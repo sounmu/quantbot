@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { ChangeBadge, DeltaValue } from "@/components/TradeVisuals";
+import { ChangeBadge, CrossSignalBadge, DeltaValue } from "@/components/TradeVisuals";
 import type { ChangeType, Holding } from "@/lib/types";
 
 type Props = {
@@ -194,6 +194,10 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                               {holding.holding_ticker ?? "미상"}
                             </span>
                             <ChangeBadge type={holding.change_type} compact />
+                            <CrossSignalBadge
+                              buying={holding.signal_n_buying}
+                              selling={holding.signal_n_selling}
+                            />
                           </div>
                           <p className="mt-2 break-words text-sm leading-snug text-muted">
                             {holding.holding_name}
@@ -233,6 +237,7 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                     <th className="px-3 py-2.5 pl-4">종목</th>
                     <th className="px-3 py-2.5">이름</th>
                     <th className="px-3 py-2.5">변동</th>
+                    <th className="px-3 py-2.5">동반 매매</th>
                     <th className="px-3 py-2.5 text-right">비중</th>
                     <th className="px-3 py-2.5 text-right">주식수</th>
                     <th className="px-3 py-2.5 text-right">주식수 변화</th>
@@ -271,6 +276,12 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                         </td>
                         <td className="py-3 pr-3">
                           <ChangeBadge type={holding.change_type} compact />
+                        </td>
+                        <td className="py-3 pr-3">
+                          <CrossSignalBadge
+                            buying={holding.signal_n_buying}
+                            selling={holding.signal_n_selling}
+                          />
                         </td>
                         <td className="py-3 pr-3 text-right tabular-nums text-ink">{holding.weight.toFixed(2)}%</td>
                         <td className="py-3 pr-3 text-right tabular-nums text-body">{formatNumber(holding.shares)}</td>

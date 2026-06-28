@@ -72,6 +72,50 @@ export function ChangeBadge({
   );
 }
 
+// 교차 시그널 배지: 같은 날 같은 종목을 매매한 시그널 ETF 수(매수/매도).
+// 나 혼자만의 베팅인지, 여러 운용사의 컨센서스인지를 한눈에 구분한다.
+export function CrossSignalBadge({
+  buying,
+  selling
+}: {
+  buying: number | null;
+  selling: number | null;
+}) {
+  const buy = buying ?? 0;
+  const sell = selling ?? 0;
+  if (buy === 0 && sell === 0) {
+    return <span className="text-xs text-muted">-</span>;
+  }
+
+  // 매수·매도 ETF 수 차이가 2 이상이면 여러 운용사가 한 방향에 동의한 컨센서스로 강조.
+  // (정적 클래스로 분기 — Tailwind JIT가 동적 템플릿 클래스를 purge하기 때문.)
+  const consensus = Math.abs(buy - sell) >= 2;
+  const consensusClass =
+    buy >= sell ? "bg-rise/10 text-rise ring-rise/15" : "bg-fall/10 text-fall ring-fall/15";
+
+  return (
+    <span
+      className={`inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium leading-none ring-1 ${
+        consensus ? consensusClass : "bg-panel text-muted ring-line"
+      }`}
+      title="같은 날 이 종목을 매매한 시그널 ETF 수 (매수 / 매도)"
+    >
+      {buy > 0 ? (
+        <span className="inline-flex items-center gap-0.5 tabular-nums text-rise">
+          <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+          {buy}
+        </span>
+      ) : null}
+      {sell > 0 ? (
+        <span className="inline-flex items-center gap-0.5 tabular-nums text-fall">
+          <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+          {sell}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function DeltaValue({ value, suffix }: { value: number | null; suffix: string }) {
   if (value === null) {
     return <span className="text-muted">-</span>;

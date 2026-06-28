@@ -84,6 +84,12 @@ class SignalDailyRepository(Protocol):
 
     async def for_security(self, security_key: str, *, limit: int = 100) -> list[SignalDaily]: ...
 
+    async def for_securities_on_date(
+        self,
+        security_keys: list[str],
+        as_of_date: date,
+    ) -> dict[str, SignalDaily]: ...
+
     async def buy_signals(self) -> list[SignalDaily]: ...
 
 

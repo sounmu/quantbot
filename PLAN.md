@@ -190,6 +190,41 @@
 
 ---
 
+## Phase H — ETF 상세 페이지 정보 확장
+
+**목표**: ETF 유니버스를 본격적으로 늘리기 전에, `/etfs/[ticker]` 상세 페이지가 보여주는 정보를 투자 판단에 더 유용하도록 보강한다.
+
+**불변 원칙 유지**: 매매 방향 판정은 항상 `shares` Δ 기준. 단, 아래 "자금흐름"에서 보듯 `weight` Δ는 *시그널 정화*의 핵심 단서로 활용한다.
+
+### H-1. 기존 데이터 노출 (구현 완료)
+백엔드(`/api/etfs/{ticker}`)가 이미 내려주지만 상세 페이지가 화면에 그리지 않던 필드를 노출. **백엔드 변경 없이 프론트만 수정.**
+- 수익률 요약(`return_1m/3m/ytd/1y`), 자산 규모(`aum`), 거래소(`exchange`), 통화(`currency`), 설정일(`inception_date`), ETF 설명(`description`), 시그널 유니버스 상태(`in_signal_universe` + `signal_universe_reason`).
+
+### H-2. 교차 시그널 (구현 완료, 차별화 핵심)
+상세 페이지 보유종목 각각에 "**다른 ETF들도 같은 날 이 종목을 매매했는가**"를 표시. `signal_daily`를 `holding_key == security_key`로 join.
+- 백엔드: `SignalDailyRepository.for_securities_on_date()` 배치 조회 → `SignalService.cross_signals()` → `/api/etfs/{ticker}/holdings` 응답에 `signal_n_buying / signal_n_selling / signal_conviction` 추가.
+- 프론트: HoldingsTable에 "매수 N · 매도 M (확신 ±K)" 배지.
+- 의미: **나 혼자만의 베팅** vs **여러 운용사의 컨센서스** 구분. 엔티티/마이그레이션 변경 없음(기존 `signal_daily` 읽기만).
+
+### H-3. (보류) AI 포트폴리오 구성 요약
+보유종목 스냅샷 + 최근 변동을 LLM으로 요약해 "이 ETF가 지금 무엇에 베팅하는가"를 자연어 1~2문단으로 제공.
+- 입력: 상위 보유종목, 테마 분포, 최근 NEW/INCREASE/EXIT 상위 항목.
+- 설계: 모델 Claude(비용은 Haiku 4.5, 품질 필요시 Sonnet 4.6). **스냅샷 날짜별 캐싱 필수** — `etf_summary(etf_id, as_of_date, summary, model, created_at)` 신규 테이블. 수집 파이프라인 말미/별도 배치에서 생성, API는 캐시 읽기만. 투자자문 회피 문구 유지.
+
+### H-4. (보류) 활동성 지표 + ETF 자금흐름
+두 개념은 층위가 다르다.
+- **(a) 포트폴리오 회전 = 활동성** — *매니저의 결정*. 내부 보유종목 교체 정도. `holding_change`로 즉시 계산(신규 수집 불필요). 지표: 스냅샷별 NEW/INCREASE/DECREASE/EXIT 건수, 회전율(turnover ≈ Σ|매매 추정액| / 총자산).
+- **(b) ETF 자금흐름 = creation/redemption** — *투자자의 결정*. 외부 자금 유입(좌수↑)/환매(좌수↓).
+  - **왜 중요한가**: 자금 유입 시 매니저 판단 없이도 전 종목 shares가 일제히 증가 → shares↑가 "확신 매수"가 아닌 기계적 매수일 수 있음. 자금흐름을 모르면 shares 시그널이 오염된다.
+  - **시그널 정화 규칙**: shares↑ 且 weight↑ → 능동적 매수(확신) ✅ / shares↑ 但 weight 보합·↓ → 자금유입에 딸려간 기계적 매수(노이즈). 자금흐름 맥락에서 `weight` Δ가 정화의 핵심 단서.
+  - **우리 데이터로 추정**(유료 데이터 불필요): `ETF 총자산 ≈ Σ(보유종목 market_value)`, `순자금흐름 ≈ 전 종목 공통 비례 증감 성분(공통 스케일 r)`, `능동적 매매 ≈ 공통 스케일에서 벗어난 잔차`. 전 종목 동일비율 증감→creation/redemption, 특정 종목만 튀는 잔차→능동적 종목선택. (yfinance `sharesOutstanding`/`netAssets`는 보조, active ETF 일별 좌수 신뢰도 들쭉날쭉이라 보유종목 기반 추정 권장.)
+  - **선행 결정 필요**: 추정 방식 확정(보유종목 기반 권장), 일별 추정 자금흐름 저장 컬럼/테이블 + 마이그레이션 여부.
+
+### H-5. (보류) Tier 3 — 신규 수집 (yfinance)
+펀더멘털 보강용, 우선순위 낮음. 배당수익률, 52주 고저, 베타. 수집 파이프라인·스키마·마이그레이션 필요.
+
+---
+
 ## 7. 결정 사항
 
 **확정**
@@ -227,5 +262,6 @@
 - [x] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단 — `evaluation_service.py`, `signal_outcome` + `0009_signal_outcome`, `GET /api/analysis/performance`, `GET /api/analysis/security/{security_key}`, admin `recompute-analysis`, T+1 이후 가격만 쓰는 단위 테스트
 - [x] F. 분석 UI (성과 화면 / 컨빅션 보드 / 종목 시그널 오버레이) — `/analysis` 모바일 허브에 horizon 토글, 버킷별 hit rate·평균 초과수익·표본수·IC, 컨빅션 랭킹, 선택 종목 참여 ETF·forward outcome 차트, 백테스트/표본수/creation-redemption 경고 표시
 - [ ] G. (선택) 페이퍼 포트폴리오 백테스트
+- [~] H. ETF 상세 페이지 정보 확장 — H-1(기존 데이터 노출)·H-2(교차 시그널) 완료, H-3(AI 구성 요약)·H-4(활동성·자금흐름)·H-5(Tier3 신규 수집) 보류
 
 > **핵심 불변식**: 시그널은 shares Δ로 정의하고, 평가는 항상 **벤치마크 대비 초과수익**으로, **공시 인지일 이후 가격**으로만 한다.

@@ -65,6 +65,31 @@ async def test_signal_service_recomputes_and_returns_participants() -> None:
     ]
 
 
+async def test_signal_service_cross_signals_maps_present_securities_only() -> None:
+    changes = FakeHoldingChangeRepository()
+    prices = FakeSecurityPriceRepository()
+    signals = FakeSignalDailyRepository()
+    service = SignalService(changes=changes, security_prices=prices, signals=signals)
+
+    await changes.upsert_many(
+        [
+            _change("ARKK", "TSLA", ChangeType.INCREASE, shares_delta=10),
+            _change("DYNF", "TSLA", ChangeType.NEW, shares_delta=5),
+            _change("ARKW", "ROKU", ChangeType.DECREASE, shares_delta=-4),
+        ]
+    )
+    await service.recompute_daily(as_of_date=date(2026, 1, 2))
+
+    cross = await service.cross_signals(["TSLA", "ROKU", "MISSING"], as_of_date=date(2026, 1, 2))
+
+    assert set(cross) == {"TSLA", "ROKU"}  # 시그널이 없는 종목은 매핑에서 빠진다
+    assert cross["TSLA"].n_buying == 2
+    assert cross["TSLA"].conviction_score == 2
+    assert cross["ROKU"].n_selling == 1
+    # 다른 날짜를 조회하면 비어 있어야 한다.
+    assert await service.cross_signals(["TSLA"], as_of_date=date(2026, 1, 5)) == {}
+
+
 async def test_signal_service_clears_a_date_when_no_priceable_changes_remain() -> None:
     changes = FakeHoldingChangeRepository()
     prices = FakeSecurityPriceRepository()

@@ -453,6 +453,27 @@ class SqlAlchemySignalDailyRepository:
         ).all()
         return [mappers.to_signal_daily(row) for row in rows]
 
+    async def for_securities_on_date(
+        self,
+        security_keys: list[str],
+        as_of_date: date,
+    ) -> dict[str, SignalDaily]:
+        if not security_keys:
+            return {}
+
+        normalized_keys = [normalize_security_key(key) for key in security_keys]
+        rows = (
+            await self._s.scalars(
+                select(SignalDailyORM)
+                .options(selectinload(SignalDailyORM.security))
+                .where(
+                    SignalDailyORM.as_of_date == as_of_date,
+                    SignalDailyORM.security_key.in_(normalized_keys),
+                )
+            )
+        ).all()
+        return {row.security_key: mappers.to_signal_daily(row) for row in rows}
+
     async def buy_signals(self) -> list[SignalDaily]:
         rows = (
             await self._s.scalars(

@@ -52,6 +52,10 @@ export type Holding = {
   shares_delta: number | null;
   shares_delta_pct: number | null;
   weight_delta: number | null;
+  // 같은 날 이 종목을 매매한 시그널 유니버스 ETF 수 (교차 시그널)
+  signal_n_buying: number | null;
+  signal_n_selling: number | null;
+  signal_conviction: number | null;
 };
 
 export type ChangeType = "NEW" | "EXIT" | "INCREASE" | "DECREASE" | "UNCHANGED";

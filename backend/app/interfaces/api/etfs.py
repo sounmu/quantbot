@@ -5,9 +5,10 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.application.services.etf_service import EtfService, EtfWithMetric
+from app.application.services.signal_service import SignalService
 from app.domain.entities import HoldingChange
 from app.domain.value_objects import holding_key
-from app.interfaces.deps import get_etf_service
+from app.interfaces.deps import get_etf_service, get_signal_service
 from app.interfaces.schemas.change import HoldingChangeResponse, PositionHistoryPointResponse
 from app.interfaces.schemas.etf import (
     CompareItem,
@@ -106,12 +107,14 @@ async def get_holdings(
     ticker: str,
     as_of_date: date | None = Query(default=None, alias="date"),
     service: EtfService = Depends(get_etf_service),
+    signal_service: SignalService = Depends(get_signal_service),
 ) -> list[HoldingResponse]:
     await _require_etf(ticker, service)
     holdings = await service.get_holdings(ticker, as_of_date=as_of_date)
+    snapshot_date = holdings[0].as_of_date if holdings else as_of_date
     changes = await service.get_holding_changes(
         ticker,
-        as_of_date=holdings[0].as_of_date if holdings and as_of_date is None else as_of_date,
+        as_of_date=snapshot_date if as_of_date is None else as_of_date,
         include_unchanged=True,
     )
     changes_by_key = {
@@ -119,6 +122,16 @@ async def get_holdings(
         for change in changes
         if (key := holding_key(change.holding_ticker, change.holding_name, change.security_id))
     }
+    holding_keys = [
+        key
+        for holding in holdings
+        if (key := holding_key(holding.holding_ticker, holding.holding_name, holding.security_id))
+    ]
+    cross_signals = (
+        await signal_service.cross_signals(holding_keys, as_of_date=snapshot_date)
+        if holding_keys and snapshot_date is not None
+        else {}
+    )
     return [
         HoldingResponse(
             as_of_date=holding.as_of_date,
@@ -133,6 +146,9 @@ async def get_holdings(
             shares_delta=change.shares_delta if change else None,
             shares_delta_pct=change.shares_delta_pct if change else None,
             weight_delta=change.weight_delta if change else None,
+            signal_n_buying=signal.n_buying if signal else None,
+            signal_n_selling=signal.n_selling if signal else None,
+            signal_conviction=signal.conviction_score if signal else None,
         )
         for holding in holdings
         for key in [
@@ -140,6 +156,7 @@ async def get_holdings(
         ]
         if key is not None
         for change in [changes_by_key.get(key)]
+        for signal in [cross_signals.get(key)]
     ]
 
 

@@ -156,6 +156,18 @@ class FakeSignalDailyRepository:
         ]
         return sorted(signals, key=lambda signal: signal.as_of_date, reverse=True)[:limit]
 
+    async def for_securities_on_date(
+        self,
+        security_keys: list[str],
+        as_of_date: date,
+    ) -> dict[str, SignalDaily]:
+        wanted = {key.strip().upper() for key in security_keys}
+        return {
+            signal.security_key: signal
+            for signal in self._store.values()
+            if signal.as_of_date == as_of_date and signal.security_key in wanted
+        }
+
     async def buy_signals(self) -> list[SignalDaily]:
         return sorted(
             [signal for signal in self._store.values() if signal.conviction_score > 0],
