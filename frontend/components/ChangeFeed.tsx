@@ -38,7 +38,7 @@ export function ChangeFeed({
   }, [changes, initialVisibleCount]);
 
   return (
-    <section className="space-y-3" aria-label={showEtf ? "최근 매매 피드" : "스냅샷 변동 피드"}>
+    <section className="space-y-3" aria-label={showEtf ? "최근 매매 내역" : "기준일 변동 내역"}>
       {errorMessage ? (
         <StatusCard tone="error">{errorMessage}</StatusCard>
       ) : isLoading ? (
@@ -74,7 +74,7 @@ export function ChangeFeed({
                         <ChangeBadge type={change.change_type} />
                       </div>
                       <h2 className="mt-2 text-lg font-bold leading-none tracking-tight text-ink">
-                        {change.holding_ticker ?? "N/A"}
+                        {change.holding_ticker ?? "미상"}
                       </h2>
                       <p className="mt-2 break-words text-sm leading-snug text-muted">
                         {change.holding_name}
@@ -86,8 +86,8 @@ export function ChangeFeed({
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-hair pt-3 text-xs">
-                    <Metric label="주식수 Δ" value={<DeltaValue value={change.shares_delta} suffix="" />} />
-                    <Metric label="비중 Δ" value={<DeltaValue value={change.weight_delta} suffix="%" />} />
+                    <Metric label="주식수 변화" value={<DeltaValue value={change.shares_delta} suffix="" />} />
+                    <Metric label="비중 변화" value={<DeltaValue value={change.weight_delta} suffix="%" />} />
                   </div>
                 </article>
               </li>
@@ -104,8 +104,8 @@ export function ChangeFeed({
                   <th className={`px-3 py-2.5 ${showEtf ? "" : "pl-4"}`}>종목</th>
                   <th className="px-3 py-2.5">이름</th>
                   <th className="px-3 py-2.5">변동</th>
-                  <th className="px-3 py-2.5 text-right">주식수 Δ</th>
-                  <th className="px-3 py-2.5 text-right">비중 Δ</th>
+                  <th className="px-3 py-2.5 text-right">주식수 변화</th>
+                  <th className="px-3 py-2.5 text-right">비중 변화</th>
                   <th className="px-3 py-2.5 pr-4 text-right">날짜</th>
                 </tr>
               </thead>
@@ -123,7 +123,7 @@ export function ChangeFeed({
                       </td>
                     ) : null}
                     <td className={`py-3 font-bold tracking-tight text-ink ${showEtf ? "pr-3" : "pl-4 pr-3"}`}>
-                      {change.holding_ticker ?? "N/A"}
+                      {change.holding_ticker ?? "미상"}
                     </td>
                     <td className="max-w-[280px] truncate py-3 pr-3 text-muted" title={change.holding_name}>
                       {change.holding_name}

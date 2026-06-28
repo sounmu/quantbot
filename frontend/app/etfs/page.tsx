@@ -33,7 +33,7 @@ export default function EtfsPage() {
       <div className="mb-5 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight tracking-tight text-ink">해외 액티브 ETF</h1>
-          <p className="mt-1 text-sm text-muted">공식 holdings 공시 추적 목록</p>
+          <p className="mt-1 text-sm text-muted">공식 보유 종목 공시 추적 목록</p>
         </div>
         <Link
           className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand px-3.5 text-sm font-semibold text-white transition hover:bg-brand/90"

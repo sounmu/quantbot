@@ -113,12 +113,12 @@ export function SignalSpotlight({ changes }: { changes: HoldingChange[] }) {
         <div className="mt-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-2xl font-bold leading-none tracking-tight text-ink">
-              {spotlight.holding_ticker ?? "N/A"}
+              {spotlight.holding_ticker ?? "미상"}
             </div>
             <p className="mt-1.5 truncate text-sm text-muted">{spotlight.holding_name}</p>
           </div>
           <div className="shrink-0 text-right">
-            <div className="text-[11px] text-faint">주식수 Δ</div>
+            <div className="text-[11px] text-faint">주식수 변화</div>
             <div className={`text-2xl font-bold leading-none tabular-nums ${tone.text}`}>
               {formatShares(spotlight.shares_delta)}
             </div>

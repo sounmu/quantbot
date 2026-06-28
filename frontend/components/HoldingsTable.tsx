@@ -28,8 +28,8 @@ const FILTER_LABELS: Record<FilterKey, string> = {
 };
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "weight", label: "비중순" },
-  { key: "sharesDelta", label: "매매량순" },
-  { key: "weightDelta", label: "비중변화순" }
+  { key: "sharesDelta", label: "주식수 변화순" },
+  { key: "weightDelta", label: "비중 변화순" }
 ];
 const PAGE_SIZE = 15;
 
@@ -191,7 +191,7 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-lg font-bold leading-none tracking-tight text-ink">
-                              {holding.holding_ticker ?? "N/A"}
+                              {holding.holding_ticker ?? "미상"}
                             </span>
                             <ChangeBadge type={holding.change_type} compact />
                           </div>
@@ -210,11 +210,11 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                       <div className="mt-4 grid grid-cols-2 gap-2 border-t border-hair pt-3 text-xs">
                         <Metric label="주식수" value={formatNumber(holding.shares)} />
                         <Metric
-                          label="주식수 Δ"
+                          label="주식수 변화"
                           value={<DeltaValue value={holding.shares_delta} suffix="" />}
                         />
                         <Metric
-                          label="비중 Δ"
+                          label="비중 변화"
                           value={<DeltaValue value={holding.weight_delta} suffix="%" />}
                         />
                         <Metric label="시장가치" value={formatMoney(holding.market_value)} />
@@ -235,8 +235,8 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                     <th className="px-3 py-2.5">변동</th>
                     <th className="px-3 py-2.5 text-right">비중</th>
                     <th className="px-3 py-2.5 text-right">주식수</th>
-                    <th className="px-3 py-2.5 text-right">주식수 Δ</th>
-                    <th className="px-3 py-2.5 text-right">비중 Δ</th>
+                    <th className="px-3 py-2.5 text-right">주식수 변화</th>
+                    <th className="px-3 py-2.5 text-right">비중 변화</th>
                     <th className="px-3 py-2.5 pr-4 text-right">시장가치</th>
                   </tr>
                 </thead>
@@ -264,7 +264,7 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                         }`}
                       >
                         <td className="py-3 pl-4 font-bold tracking-tight text-ink">
-                          {holding.holding_ticker ?? "N/A"}
+                          {holding.holding_ticker ?? "미상"}
                         </td>
                         <td className="max-w-[260px] truncate py-3 pr-3 text-muted" title={holding.holding_name}>
                           {holding.holding_name}

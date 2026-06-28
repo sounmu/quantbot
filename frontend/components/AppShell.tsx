@@ -7,7 +7,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 const TABS = [
   { href: "/etfs", label: "목록", icon: Table2 },
-  { href: "/changes", label: "피드", icon: Activity },
+  { href: "/changes", label: "매매", icon: Activity },
   { href: "/analysis", label: "분석", icon: LineChart },
   { href: "/compare", label: "비교", icon: GitCompare }
 ];
@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="flex items-center justify-between border-t border-line px-5 py-4">
           <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
-            shares Δ
+            주식수 기준
           </span>
           <ThemeToggle />
         </div>
@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand">
-              shares Δ
+              주식수 기준
             </span>
             <ThemeToggle />
           </div>

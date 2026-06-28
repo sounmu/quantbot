@@ -27,6 +27,7 @@ import { useChartPalette } from "@/components/ThemeProvider";
 import { useAnalysisPerformance, useSecurityAnalysis } from "@/hooks/useAnalysis";
 import { useDailySignals, useSignalSecurityHistory } from "@/hooks/useSignals";
 import type {
+  ChangeType,
   HorizonDays,
   PerformanceBucket,
   PerformanceSummary,
@@ -45,6 +46,14 @@ const BUCKETS: Array<{ key: PerformanceBucket; label: string; caption: string }>
   { key: "conviction_2_plus", label: "2+ ETF", caption: "복수 ETF 동시 매수" },
   { key: "conviction_3_plus", label: "3+ ETF", caption: "강한 군집 매수" }
 ];
+
+const CHANGE_TYPE_LABELS: Record<ChangeType, string> = {
+  NEW: "신규",
+  EXIT: "청산",
+  INCREASE: "증가",
+  DECREASE: "감소",
+  UNCHANGED: "유지"
+};
 
 export default function AnalysisPage() {
   const [horizon, setHorizon] = useState<HorizonDays>(20);
@@ -88,10 +97,10 @@ export default function AnalysisPage() {
   return (
     <AppShell>
       <div className="mb-5">
-        <p className="text-xs font-semibold uppercase text-faint">Signal lab</p>
+        <p className="text-xs font-semibold text-faint">시그널 분석</p>
         <h1 className="mt-1 text-2xl font-bold leading-tight text-ink">분석</h1>
         <p className="mt-2 text-sm leading-snug text-muted">
-          shares가 늘어난 종목을 T+1 이후 QQQ 대비 초과수익으로 검증합니다.
+          주식수가 늘어난 종목을 T+1 이후 QQQ 대비 초과수익으로 검증합니다.
         </p>
       </div>
 
@@ -101,7 +110,7 @@ export default function AnalysisPage() {
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-brand">
                 <Target className="h-4 w-4" aria-hidden="true" />
-                컨빅션 검증
+                확신도 검증
               </div>
               <h2 className="mt-2 text-lg font-bold leading-snug text-ink">
                 {horizon}거래일 뒤, 복수 ETF 매수는 통했나?
@@ -129,14 +138,14 @@ export default function AnalysisPage() {
           isLoading={performance.isLoading}
         />
 
-        <section className="space-y-3" aria-label="컨빅션 보드">
+        <section className="space-y-3" aria-label="확신도 보드">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-brand">
                 <Users className="h-4 w-4" aria-hidden="true" />
                 오늘의 동시 매수
               </div>
-              <h2 className="mt-1 text-lg font-bold text-ink">컨빅션 보드</h2>
+              <h2 className="mt-1 text-lg font-bold text-ink">확신도 보드</h2>
             </div>
             {convictionSignals[0]?.as_of_date ? (
               <time className="text-xs font-medium tabular-nums text-faint" dateTime={convictionSignals[0].as_of_date}>
@@ -173,7 +182,7 @@ function HeroMetrics({ summary }: { summary: PerformanceSummary | null }) {
   return (
     <div className="mt-4 grid grid-cols-2 gap-2">
       <MetricCard
-        label="Hit rate"
+        label="적중률"
         value={formatPercent(summary?.hit_rate ?? null)}
         caption="초과수익 > 0"
         tone={summary?.hit_rate != null && summary.hit_rate >= 0.5 ? "positive" : "neutral"}
@@ -184,9 +193,9 @@ function HeroMetrics({ summary }: { summary: PerformanceSummary | null }) {
         caption="QQQ 대비"
         tone={toneForReturn(summary?.average_excess_return ?? null)}
       />
-      <MetricCard label="표본수" value={formatInteger(summary?.sample_size ?? 0)} caption="완료된 forward window" />
+      <MetricCard label="표본수" value={formatInteger(summary?.sample_size ?? 0)} caption="평가 완료 구간" />
       <MetricCard
-        label="IC"
+        label="정보계수"
         value={formatRatio(summary?.information_coefficient ?? null)}
         caption="시그널 강도와 성과"
         tone={toneForReturn(summary?.information_coefficient ?? null)}
@@ -214,7 +223,7 @@ function HorizonToggle({
           }`}
           aria-pressed={value === horizon}
         >
-          {horizon}D
+          {horizon}일
         </button>
       ))}
     </div>
@@ -290,7 +299,9 @@ function BucketRow({
           <div className="text-xs font-semibold tabular-nums text-ink">
             n={formatInteger(summary?.sample_size ?? 0)}
           </div>
-          <div className="mt-0.5 text-[11px] text-faint">IC {formatRatio(summary?.information_coefficient ?? null)}</div>
+          <div className="mt-0.5 text-[11px] text-faint">
+            정보계수 {formatRatio(summary?.information_coefficient ?? null)}
+          </div>
         </div>
       </div>
 
@@ -321,7 +332,7 @@ function ConvictionBoard({
   onSelect: (securityKey: string) => void;
 }) {
   if (isError) {
-    return <StatusCard tone="error">컨빅션 랭킹을 불러오지 못했습니다.</StatusCard>;
+    return <StatusCard tone="error">확신도 랭킹을 불러오지 못했습니다.</StatusCard>;
   }
   if (isLoading) {
     return <CardSkeletonList count={4} metrics={2} />;
@@ -402,7 +413,7 @@ function SecuritySignalPanel({
           <h2 className="mt-2 truncate text-xl font-bold text-ink">
             {selectedTicker || "선택된 종목 없음"}
           </h2>
-          <p className="mt-1 truncate text-sm text-muted">{selectedName || "컨빅션 보드에서 종목을 선택하세요."}</p>
+          <p className="mt-1 truncate text-sm text-muted">{selectedName || "확신도 보드에서 종목을 선택하세요."}</p>
         </div>
         {latest ? (
           <time className="shrink-0 text-xs font-medium tabular-nums text-faint" dateTime={latest.as_of_date}>
@@ -426,12 +437,12 @@ function SecuritySignalPanel({
       ) : (
         <div className="mt-4 space-y-4">
           <div className="grid grid-cols-3 gap-2">
-            <MetricCard label="매수 ETF" value={formatInteger(latest?.n_buying ?? selectedSignal.n_buying)} caption="latest" />
-            <MetricCard label="매도 ETF" value={formatInteger(latest?.n_selling ?? selectedSignal.n_selling)} caption="latest" />
+            <MetricCard label="매수 ETF" value={formatInteger(latest?.n_buying ?? selectedSignal.n_buying)} caption="최신" />
+            <MetricCard label="매도 ETF" value={formatInteger(latest?.n_selling ?? selectedSignal.n_selling)} caption="최신" />
             <MetricCard
               label="순달러흐름"
               value={formatCompactCurrency(latest?.net_dollar_flow ?? selectedSignal.net_dollar_flow)}
-              caption="shares Δ × 가격"
+              caption="주식수 변화 × 가격"
             />
           </div>
 
@@ -466,7 +477,7 @@ function OutcomeChart({ points, horizon }: { points: SecurityAnalysisPoint[]; ho
   if (chartData.length === 0) {
     return (
       <StatusCard>
-        {horizon}D 평가가 완료된 과거 시그널이 아직 없습니다.
+        {horizon}거래일 평가가 완료된 과거 시그널이 아직 없습니다.
       </StatusCard>
     );
   }
@@ -475,7 +486,7 @@ function OutcomeChart({ points, horizon }: { points: SecurityAnalysisPoint[]; ho
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink">시그널 이후 초과수익</h3>
-        <span className="text-xs text-faint">막대: QQQ 대비, 선: conviction</span>
+        <span className="text-xs text-faint">막대: QQQ 대비, 선: 확신도</span>
       </div>
       <div className="h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
@@ -495,7 +506,7 @@ function OutcomeChart({ points, horizon }: { points: SecurityAnalysisPoint[]; ho
               formatter={(value, name) => {
                 const numeric = Number(value);
                 if (name === "signalScore") {
-                  return [formatRatio(numeric), "conviction"];
+                  return [formatRatio(numeric), "확신도"];
                 }
                 if (name === "stockReturn") {
                   return [formatPercent(numeric / 100, true), "종목"];
@@ -558,7 +569,7 @@ function ParticipantList({ participants }: { participants: SignalParticipant[] }
                 <div className="text-xs font-semibold tabular-nums text-ink">
                   {formatSignedNumber(participant.shares_delta)}
                 </div>
-                <div className="text-[11px] text-faint">{participant.change_type}</div>
+                <div className="text-[11px] text-faint">{CHANGE_TYPE_LABELS[participant.change_type]}</div>
               </div>
             </li>
           ))}
@@ -636,7 +647,7 @@ function AverageBar({ value, maxAverage }: { value: number | null; maxAverage: n
   return (
     <div>
       <div className="mb-1 flex justify-between text-[11px] text-muted">
-        <span>avg excess</span>
+        <span>평균 초과수익</span>
         <span className={`font-semibold tabular-nums ${toneClassForReturn(value)}`}>
           {formatPercent(value, true)}
         </span>
@@ -681,7 +692,7 @@ function Disclaimer() {
         해석 주의
       </div>
       백테스트 결과는 투자자문이 아니며 과거 성과가 미래 성과를 보장하지 않습니다. ETF의
-      creation/redemption 때문에 shares Δ가 일부 오염될 수 있어 표본수, horizon, 벤치마크 대비
+      설정/환매 때문에 주식수 변화가 일부 왜곡될 수 있어 표본수, 평가 기간, 벤치마크 대비
       초과수익을 함께 봐야 합니다.
     </section>
   );

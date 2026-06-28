@@ -97,13 +97,13 @@ export default function EtfDetailPage() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-3 xl:items-start">
-        {/* 좌측: 보유 종목 스냅샷 */}
+        {/* 좌측: 기준일 보유 현황 */}
         <div className="space-y-4 xl:col-span-2">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-bold tracking-tight text-ink">보유 종목 스냅샷</h2>
+              <h2 className="text-lg font-bold tracking-tight text-ink">기준일 보유 현황</h2>
               <p className="mt-1 text-sm text-muted">
-                주식수 Δ 기준으로 실제 매매 방향을 판정하고, 비중 Δ는 보조 지표로 표시합니다.
+                주식수 변화 기준으로 실제 매매 방향을 판정하고, 비중 변화는 보조 지표로 표시합니다.
               </p>
             </div>
             <select
@@ -140,10 +140,10 @@ export default function EtfDetailPage() {
           />
         </div>
 
-        {/* 우측: 가격 컨텍스트 + 스냅샷 변동 피드 */}
+        {/* 우측: 가격 흐름 + 기준일 변동 내역 */}
         <div className="space-y-6 xl:col-span-1">
           <div className="space-y-3">
-            <h2 className="text-lg font-bold tracking-tight text-ink">가격 컨텍스트</h2>
+            <h2 className="text-lg font-bold tracking-tight text-ink">가격 흐름</h2>
             <div className="flex gap-1 rounded-lg bg-panel p-1">
               {RANGES.map((item) => (
                 <button
@@ -163,11 +163,11 @@ export default function EtfDetailPage() {
           </div>
 
           <div>
-            <h2 className="mb-3 text-lg font-bold tracking-tight text-ink">스냅샷 변동 피드</h2>
+            <h2 className="mb-3 text-lg font-bold tracking-tight text-ink">기준일 변동 내역</h2>
             <ChangeFeed
               changes={holdingChanges.data ?? []}
               isLoading={holdingChanges.isLoading}
-              errorMessage={holdingChanges.isError ? "스냅샷 변동 데이터를 불러오지 못했습니다." : undefined}
+              errorMessage={holdingChanges.isError ? "기준일 변동 데이터를 불러오지 못했습니다." : undefined}
               initialVisibleCount={5}
               visibleStep={5}
               dense
@@ -177,7 +177,7 @@ export default function EtfDetailPage() {
       </div>
 
       <p className="mt-6 text-xs text-muted">
-        본 화면은 발행사 공시 holdings를 재가공한 정보이며 투자자문이 아닙니다.
+        본 화면은 발행사 공시 보유 종목을 재가공한 정보이며 투자자문이 아닙니다.
       </p>
     </AppShell>
   );
