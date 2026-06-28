@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChangeBadge, CHANGE_DOT, DeltaValue } from "@/components/TradeVisuals";
+import { ChangeBadge, DeltaValue } from "@/components/TradeVisuals";
 import { CardSkeletonList } from "@/components/Skeleton";
 import type { HoldingChange } from "@/lib/types";
 
@@ -48,17 +48,11 @@ export function ChangeFeed({
       ) : (
         <>
           {/* 모바일(+dense 사이드 컬럼): 타임라인 카드 */}
-          <ol className={`relative space-y-3 border-l border-line pl-4 ${dense ? "" : "lg:hidden"}`}>
+          <ol className={`space-y-3 ${dense ? "" : "lg:hidden"}`}>
             {visibleChanges.map((change) => (
               <li
                 key={`${change.ticker}-${change.as_of_date}-${change.holding_ticker}-${change.holding_name}`}
-                className="relative"
               >
-                <span
-                  className={`absolute -left-[21px] top-5 h-3 w-3 rounded-full border-2 border-surface ${
-                    CHANGE_DOT[change.change_type] ?? "bg-muted/50"
-                  }`}
-                />
                 <article className="rounded-lg border border-line bg-surface p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
