@@ -25,6 +25,9 @@ class SignalUniversePolicy:
             return SignalUniverseDecision(False, "inactive")
         if not etf.discloses_daily:
             return SignalUniverseDecision(False, "non_daily_disclosure")
+        unsupported_reason = unsupported_analysis_reason(etf)
+        if unsupported_reason is not None:
+            return SignalUniverseDecision(False, unsupported_reason)
         if not etf.exchange:
             return SignalUniverseDecision(False, "missing_exchange")
         if _normalize_exchange(etf.exchange) not in self.exchanges:
@@ -69,3 +72,35 @@ async def refresh_signal_universe(
 
 def _normalize_exchange(exchange: str) -> str:
     return re.sub(r"[^A-Z0-9]+", "", exchange.upper())
+
+
+def unsupported_analysis_reason(etf: Etf) -> str | None:
+    text = _normalize_strategy_text(" ".join(value for value in (etf.name, etf.theme) if value))
+    if any(
+        token in text
+        for token in (
+            "INTERNATIONAL",
+            "NON US",
+            "EX US",
+            "DEVELOPED MARKETS",
+            "EMERGING MARKETS",
+        )
+    ):
+        return "non_us_equity"
+    if any(
+        token in text
+        for token in (
+            "FIXED INCOME",
+            "BOND",
+            "PREFERRED",
+            "SHORT MATURITY",
+            "MUNICIPAL",
+            "TREASURY",
+        )
+    ):
+        return "non_equity_strategy"
+    return None
+
+
+def _normalize_strategy_text(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", " ", value.upper())

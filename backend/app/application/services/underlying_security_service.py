@@ -3,13 +3,62 @@ from __future__ import annotations
 import re
 from datetime import UTC, date, datetime
 
+from app.application.services.universe_service import unsupported_analysis_reason
 from app.domain.entities import Holding, Security
 from app.domain.repositories import EtfRepository, HoldingRepository, SecurityRepository
 from app.domain.value_objects import holding_key, normalize_security_key, normalize_ticker
 
 
-_PRICE_TICKER_PATTERN = re.compile(r"^[A-Z][A-Z0-9.-]{0,15}$")
+_PRICE_TICKER_PATTERN = re.compile(r"^[A-Z]{1,5}(?:-[A-Z])?$")
 _ISIN_PATTERN = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
+_CURRENCY_PLACEHOLDER_PATTERN = re.compile(r"^[A-Z]{3}9{6}$")
+_NON_US_CURRENCY_CODES = {
+    "AUD",
+    "BRL",
+    "CAD",
+    "CHF",
+    "CNH",
+    "CNY",
+    "DKK",
+    "EUR",
+    "GBP",
+    "HKD",
+    "IDR",
+    "ILS",
+    "INR",
+    "JPY",
+    "KRW",
+    "MXN",
+    "MYR",
+    "NOK",
+    "NZD",
+    "PHP",
+    "PLN",
+    "SEK",
+    "SGD",
+    "THB",
+    "TRY",
+    "TWD",
+    "ZAR",
+}
+_UNSUPPORTED_SECURITY_NAME_TOKENS = {
+    "BOND",
+    "BONDS",
+    "ETF",
+    "FORWARD",
+    "FUND",
+    "FUTURE",
+    "NOTE",
+    "NOTES",
+    "OPTION",
+    "PREFERENCE",
+    "PREFERRED",
+    "RIGHT",
+    "RIGHTS",
+    "STAKING",
+    "WARRANT",
+    "WARRANTS",
+}
 _SECURITY_PAGE_SIZE = 500
 
 
@@ -45,7 +94,7 @@ class UnderlyingSecurityService:
         while True:
             batch, total = await self._etfs.list(page=page, page_size=_SECURITY_PAGE_SIZE)
             for etf in batch:
-                if not etf.in_signal_universe:
+                if not etf.in_signal_universe or unsupported_analysis_reason(etf) is not None:
                     continue
                 for holding in await self._holdings.latest(etf.ticker):
                     security = security_from_holding(holding)
@@ -97,7 +146,13 @@ def price_ticker_for_holding(holding: Holding) -> str | None:
         return None
 
     security_id = (holding.security_id or "").strip().upper()
+    if _is_currency_placeholder(security_id) or security_id.startswith("999"):
+        return None
     if _ISIN_PATTERN.fullmatch(security_id) and not security_id.startswith("US"):
+        return None
+    if _has_explicit_non_us_currency(holding.holding_name):
+        return None
+    if _has_unsupported_security_name(holding.holding_name):
         return None
     return ticker
 
@@ -124,13 +179,31 @@ def _normalize_price_ticker(ticker: str | None) -> str | None:
     if ticker is None:
         return None
     raw = ticker.strip()
-    if not raw or any(char.isspace() for char in raw):
+    if not raw or any(char.isspace() for char in raw) or "." in raw:
         return None
 
     normalized = normalize_ticker(raw).replace("/", "-")
+    if _is_currency_placeholder(normalized):
+        return None
+    if any(char.isdigit() for char in normalized):
+        return None
     if not _PRICE_TICKER_PATTERN.fullmatch(normalized):
         return None
     return normalized
+
+
+def _is_currency_placeholder(value: str) -> bool:
+    return bool(_CURRENCY_PLACEHOLDER_PATTERN.fullmatch(value))
+
+
+def _has_explicit_non_us_currency(name: str) -> bool:
+    tokens = set(re.sub(r"[^A-Z0-9]+", " ", name.upper()).split())
+    return bool(tokens & _NON_US_CURRENCY_CODES)
+
+
+def _has_unsupported_security_name(name: str) -> bool:
+    tokens = set(re.sub(r"[^A-Z0-9]+", " ", name.upper()).split())
+    return bool(tokens & _UNSUPPORTED_SECURITY_NAME_TOKENS)
 
 
 def _dedupe_securities(securities: list[Security]) -> list[Security]:

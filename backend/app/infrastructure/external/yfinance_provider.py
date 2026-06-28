@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import warnings
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -43,12 +44,12 @@ class YFinanceMarketDataProvider:
 
     def _fetch_prices_sync(self, ticker: str, lookback_days: int) -> list[PricePoint]:
         import yfinance as yf
+        from yfinance.exceptions import YFPricesMissingError, YFTickerMissingError, YFTzMissingError
 
-        frame = yf.Ticker(ticker).history(
-            period=f"{max(lookback_days, 1)}d",
-            interval="1d",
-            auto_adjust=False,
-        )
+        try:
+            frame = self._history(yf.Ticker(ticker), lookback_days)
+        except (YFPricesMissingError, YFTickerMissingError, YFTzMissingError):
+            return []
         if frame.empty:
             return []
 
@@ -76,12 +77,12 @@ class YFinanceMarketDataProvider:
         lookback_days: int,
     ) -> list[SecurityPrice]:
         import yfinance as yf
+        from yfinance.exceptions import YFPricesMissingError, YFTickerMissingError, YFTzMissingError
 
-        frame = yf.Ticker(security.ticker).history(
-            period=f"{max(lookback_days, 1)}d",
-            interval="1d",
-            auto_adjust=False,
-        )
+        try:
+            frame = self._history(yf.Ticker(security.ticker), lookback_days)
+        except (YFPricesMissingError, YFTickerMissingError, YFTzMissingError):
+            return []
         if frame.empty:
             return []
 
@@ -118,6 +119,20 @@ class YFinanceMarketDataProvider:
             exchange=exchange,
             aum=aum,
         )
+
+    def _history(self, ticker: Any, lookback_days: int) -> Any:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="'raise_errors' deprecated.*",
+                category=DeprecationWarning,
+            )
+            return ticker.history(
+                period=f"{max(lookback_days, 1)}d",
+                interval="1d",
+                auto_adjust=False,
+                raise_errors=True,
+            )
 
     def _date_from_index(self, value: Any) -> date:
         if hasattr(value, "date"):

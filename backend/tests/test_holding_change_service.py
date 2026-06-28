@@ -6,7 +6,7 @@ import pytest
 
 from app.application.services.holding_change_service import HoldingChangeService
 from app.domain.entities import Holding
-from app.domain.value_objects import ChangeType
+from app.domain.value_objects import ChangeType, holding_key
 
 
 def test_diff_classifies_new_exit_increase_decrease_and_unchanged() -> None:
@@ -53,6 +53,10 @@ def test_diff_uses_name_fallback_and_ignores_cash() -> None:
     assert len(changes) == 1
     assert changes[0].change_type == ChangeType.INCREASE
     assert changes[0].holding_ticker is None
+
+
+def test_holding_key_ignores_currency_placeholders() -> None:
+    assert holding_key("GBP999999", "GBP Spot FX", "GBP999999") is None
 
 
 def test_diff_rejects_missing_shares_for_matched_holding() -> None:

@@ -43,6 +43,15 @@ async def test_discovers_priceable_latest_signal_universe_holdings() -> None:
                     security_id="GB0009633180"),
             Holding("AVDV", date(2026, 1, 2), "Tickerless US Co", 1, None, shares=5,
                     security_id="US0000000001"),
+            Holding(
+                "AVDV",
+                date(2026, 1, 2),
+                "Bank of Queensland Ltd Common Stock",
+                1,
+                "BOQ",
+                shares=5,
+                security_id="607624909",
+            ),
             Holding("SMALL", date(2026, 1, 2), "Ignored Inc", 1, "IGN", shares=5),
         ]
     )
@@ -75,6 +84,56 @@ def test_price_ticker_for_holding_excludes_tickerless_and_non_us_isin() -> None:
     assert price_ticker_for_holding(
         Holding("ARKK", date(2026, 1, 2), "Berkshire", 1, "BRK/B")
     ) == "BRK-B"
+
+
+def test_price_ticker_for_holding_excludes_currency_and_local_market_symbols() -> None:
+    assert (
+        price_ticker_for_holding(
+            Holding(
+                "AVDV",
+                date(2026, 1, 2),
+                "GBP Spot FX",
+                0,
+                "GBP999999",
+                security_id="GBP999999",
+            )
+        )
+        is None
+    )
+    assert (
+        price_ticker_for_holding(
+            Holding(
+                "CGGR",
+                date(2026, 1, 2),
+                "SK HYNIX INC COMMON STOCK KRW5000.0",
+                1,
+                "A000660",
+                security_id="645026907.0",
+            )
+        )
+        is None
+    )
+    assert (
+        price_ticker_for_holding(
+            Holding("AVDV", date(2026, 1, 2), "JD Sports Fashion PLC", 1, "JD.")
+        )
+        is None
+    )
+    assert (
+        price_ticker_for_holding(
+            Holding("AVDV", date(2026, 1, 2), "Ensilica PLC", 1, "ENSIGBX")
+        )
+        is None
+    )
+    assert (
+        price_ticker_for_holding(
+            Holding("ARKW", date(2026, 1, 2), "3IQ ETHER STAKING ETF", 1, "ETHQ/U")
+        )
+        is None
+    )
+    assert price_ticker_for_holding(
+        Holding("TCAF", date(2026, 1, 2), "NVIDIA CORP COMMON STOCK USD.001", 1, "NVDA")
+    ) == "NVDA"
 
 
 def test_incremental_price_lookback_days_skips_current_and_caps_old_ranges() -> None:

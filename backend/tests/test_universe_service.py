@@ -55,6 +55,48 @@ def test_signal_universe_policy_rejects_missing_or_small_metadata() -> None:
     assert wrong_exchange.reason == "exchange_not_allowed"
 
 
+def test_signal_universe_policy_rejects_non_us_or_non_equity_strategies() -> None:
+    policy = SignalUniversePolicy(min_aum=100_000_000, exchanges=["NYSEArca"])
+
+    international = policy.evaluate(
+        Etf(
+            ticker="AVDV",
+            name="Avantis International Small Cap Value ETF",
+            issuer="Avantis",
+            theme="International Value",
+            exchange="NYSEArca",
+            discloses_daily=True,
+        ),
+        aum=20_000_000_000,
+    )
+    fixed_income = policy.evaluate(
+        Etf(
+            ticker="TOTL",
+            name="SPDR DoubleLine Total Return Tactical ETF",
+            issuer="State Street",
+            theme="Fixed Income",
+            exchange="NYSEArca",
+            discloses_daily=True,
+        ),
+        aum=4_000_000_000,
+    )
+    preferred = policy.evaluate(
+        Etf(
+            ticker="PFFA",
+            name="Virtus InfraCap U.S. Preferred Stock ETF",
+            issuer="Virtus",
+            theme="Preferred Income",
+            exchange="NYSEArca",
+            discloses_daily=True,
+        ),
+        aum=2_000_000_000,
+    )
+
+    assert international.reason == "non_us_equity"
+    assert fixed_income.reason == "non_equity_strategy"
+    assert preferred.reason == "non_equity_strategy"
+
+
 @pytest.mark.asyncio
 async def test_refresh_signal_universe_recalculates_from_metric_aum() -> None:
     etfs = FakeEtfRepository()

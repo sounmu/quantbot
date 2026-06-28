@@ -85,9 +85,11 @@ uv run python -m app.application.pipeline.collect --with-underlying-prices --loo
 `totalAssets`로 ETF profile을 보강하고, `SIGNAL_MIN_AUM`과
 `SIGNAL_EXCHANGES` 기준으로 `in_signal_universe`를 재계산합니다. yfinance profile은
 공식 발행사 데이터가 아니므로 seed JSON의 `exchange`/`aum` 필드로 수동 보정할 수 있습니다.
+분석 유니버스는 현재 US equity 시그널 검증용이므로 국제주식, 채권, 우선주 전략은 제외됩니다.
 `--with-underlying-prices`는 현재 분석 유니버스 ETF의 최신 holdings에서 ticker가 있는
 US/US-ISIN 후보만 `security`로 등록하고, yfinance의 `Adj Close`를 `security_price`에
-증분 저장합니다. `BENCHMARK_TICKER`(기본 `QQQ`)도 같은 가격 스토어에 적재됩니다.
+증분 저장합니다. FX placeholder(`GBP999999` 등), 해외 로컬 ticker, 비-USD 표시 종목은
+가격 수집 후보에서 제외합니다. `BENCHMARK_TICKER`(기본 `QQQ`)도 같은 가격 스토어에 적재됩니다.
 holdings 또는 underlying 가격이 갱신되면 `signal_daily`도 재계산되어 여러 ETF가
 동시에 매수/매도한 종목의 conviction ranking을 제공합니다.
 이어 BUY signal(`conviction_score > 0`)은 `BENCHMARK_TICKER` 대비 1/5/20/60거래일

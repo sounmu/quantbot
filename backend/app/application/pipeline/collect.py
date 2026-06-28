@@ -281,6 +281,8 @@ async def _collect_once_unlocked(
                             security,
                             lookback_days=lookback,
                         )
+                        if not fetched:
+                            await securities.upsert_many([replace(security, is_priceable=False)])
                         written = await security_prices.upsert_many(fetched)
                         processed += written
                         await session.commit()

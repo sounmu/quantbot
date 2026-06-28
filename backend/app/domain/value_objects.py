@@ -26,6 +26,38 @@ class SignalDirection:
 
 _CASH_TOKENS = {"", "--", "-", "CASH", "USD", "US DOLLAR", "DOLLAR", "MONEYMARKET"}
 _CASH_NAME_TOKENS = {"CASH", "CASHEQUIVALENTS", "CASHANDEQUIVALENTS", "USD", "USDOLLAR"}
+_CURRENCY_CODES = {
+    "AUD",
+    "BRL",
+    "CAD",
+    "CHF",
+    "CNH",
+    "CNY",
+    "DKK",
+    "EUR",
+    "GBP",
+    "HKD",
+    "IDR",
+    "ILS",
+    "INR",
+    "JPY",
+    "KRW",
+    "MXN",
+    "MYR",
+    "NOK",
+    "NZD",
+    "PHP",
+    "PLN",
+    "SEK",
+    "SGD",
+    "THB",
+    "TRY",
+    "TWD",
+    "USD",
+    "ZAR",
+}
+_CURRENCY_PLACEHOLDER_PATTERN = re.compile(r"^[A-Z]{3}9{6}$")
+_CURRENCY_NAME_MARKERS = {"CURRENCY", "FORWARD", "FX", "SPOT"}
 
 
 def holding_key(
@@ -40,15 +72,31 @@ def holding_key(
         normalized_id = security_id.strip().upper()
         if (
             normalized_id
-            and normalized_id not in _CASH_TOKENS
+            and not _is_cash_like_token(normalized_id)
             and not normalized_id.startswith("999")
         ):
             return f"ID:{normalized_id}"
 
-    if holding_ticker and holding_ticker.strip().upper() not in _CASH_TOKENS:
+    if holding_ticker and not _is_cash_like_token(holding_ticker):
         return holding_ticker.strip().upper()
 
     normalized_name = re.sub(r"[^A-Z0-9]", "", holding_name.upper())
-    if not normalized_name or normalized_name in _CASH_NAME_TOKENS:
+    if _is_cash_like_name(holding_name, normalized_name):
         return None
     return f"NAME:{normalized_name}"
+
+
+def _is_cash_like_token(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().upper()
+    return normalized in _CASH_TOKENS or bool(_CURRENCY_PLACEHOLDER_PATTERN.fullmatch(normalized))
+
+
+def _is_cash_like_name(value: str, normalized_name: str) -> bool:
+    if not normalized_name or normalized_name in _CASH_NAME_TOKENS:
+        return True
+    if _CURRENCY_PLACEHOLDER_PATTERN.fullmatch(normalized_name):
+        return True
+    tokens = set(re.sub(r"[^A-Z0-9]+", " ", value.upper()).split())
+    return bool(tokens & _CURRENCY_CODES) and bool(tokens & _CURRENCY_NAME_MARKERS)
