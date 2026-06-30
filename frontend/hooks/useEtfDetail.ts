@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchEtfDetail,
+  fetchEtfFlow,
   fetchEtfPrices,
   fetchHoldingChanges,
   fetchHoldingDates,
@@ -22,6 +23,14 @@ export function useEtfPrices(ticker: string, range: string) {
   return useQuery({
     queryKey: ["prices", ticker, range],
     queryFn: () => fetchEtfPrices(ticker, range),
+    enabled: ticker.length > 0
+  });
+}
+
+export function useEtfFlow(ticker: string, range: string) {
+  return useQuery({
+    queryKey: ["etf-flow", ticker, range],
+    queryFn: () => fetchEtfFlow(ticker, range),
     enabled: ticker.length > 0
   });
 }

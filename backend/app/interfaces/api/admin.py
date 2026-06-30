@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.pipeline.collect import acquire_collection_lock, collect_once
 from app.application.services.evaluation_service import EvaluationService
+from app.application.services.flow_service import FlowService
 from app.application.services.signal_service import SignalService
 from app.config import get_settings
 from app.infrastructure.db.engine import get_session
@@ -19,7 +20,10 @@ from app.infrastructure.db.orm_models import CollectionRunORM, EtfHoldingORM, Et
 from app.infrastructure.db.repositories import (
     SqlAlchemyCollectionItemLogRepository,
     SqlAlchemyCollectionRunRepository,
+    SqlAlchemyEtfFlowRepository,
+    SqlAlchemyEtfRepository,
     SqlAlchemyHoldingChangeRepository,
+    SqlAlchemyHoldingRepository,
     SqlAlchemySecurityPriceRepository,
     SqlAlchemySignalDailyRepository,
     SqlAlchemySignalOutcomeRepository,
@@ -294,6 +298,41 @@ async def recompute_signals(
         "status": "recomputed",
         "date": as_of_date.isoformat() if as_of_date else None,
         "signals": written,
+    }
+
+
+@router.post("/recompute-flows")
+async def recompute_flows(
+    request: Request,
+    ticker: str | None = Query(default=None),
+    as_of_date: date | None = Query(default=None, alias="date"),
+    x_admin_token: str | None = Header(default=None),
+    x_admin_email: str | None = Header(default=None),
+    x_admin_group: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int | str | None]:
+    _require_admin(x_admin_token, x_admin_email, x_admin_group)
+    _check_rate_limit(x_admin_token, request)
+    etfs = SqlAlchemyEtfRepository(session)
+    service = FlowService(
+        holdings=SqlAlchemyHoldingRepository(session),
+        flows=SqlAlchemyEtfFlowRepository(session),
+    )
+    if ticker is not None:
+        tickers = [ticker.strip().upper()]
+    else:
+        universe, _ = await etfs.list(page=1, page_size=1000)
+        tickers = [etf.ticker for etf in universe]
+
+    written = 0
+    for target_ticker in tickers:
+        written += await service.recompute_for_etf(target_ticker, as_of_date=as_of_date)
+    await session.commit()
+    return {
+        "status": "recomputed",
+        "ticker": ticker.strip().upper() if ticker else None,
+        "date": as_of_date.isoformat() if as_of_date else None,
+        "flows": written,
     }
 
 

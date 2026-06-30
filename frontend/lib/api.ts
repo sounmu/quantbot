@@ -1,6 +1,7 @@
 import type {
   CompareResponse,
   EtfDetail,
+  EtfFlow,
   EtfListResponse,
   EtfQuery,
   HoldingChange,
@@ -49,6 +50,10 @@ export function fetchEtfDetail(ticker: string) {
 
 export function fetchEtfPrices(ticker: string, range: string) {
   return fetchJson<PricePoint[]>(`/api/etfs/${ticker}/prices${toSearchParams({ range })}`);
+}
+
+export function fetchEtfFlow(ticker: string, range: string) {
+  return fetchJson<EtfFlow[]>(`/api/etfs/${ticker}/flow${toSearchParams({ range })}`);
 }
 
 export function fetchHoldings(ticker: string, date?: string) {

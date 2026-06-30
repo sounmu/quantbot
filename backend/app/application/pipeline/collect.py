@@ -7,8 +7,9 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from app.application.services.holding_change_service import HoldingChangeService
 from app.application.services.evaluation_service import EvaluationService
+from app.application.services.flow_service import decompose_flow
+from app.application.services.holding_change_service import HoldingChangeService
 from app.application.services.metric_service import MetricService
 from app.application.services.signal_service import SignalService
 from app.application.services.underlying_security_service import (
@@ -28,6 +29,7 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyCollectionLockRepository,
     SqlAlchemyCollectionRunRepository,
     SqlAlchemyEtfRepository,
+    SqlAlchemyEtfFlowRepository,
     SqlAlchemyHoldingChangeRepository,
     SqlAlchemyHoldingRepository,
     SqlAlchemyMetricRepository,
@@ -112,6 +114,7 @@ async def _collect_once_unlocked(
         metrics = SqlAlchemyMetricRepository(session)
         holdings = SqlAlchemyHoldingRepository(session)
         changes = SqlAlchemyHoldingChangeRepository(session)
+        flows = SqlAlchemyEtfFlowRepository(session)
         securities = SqlAlchemySecurityRepository(session)
         security_prices = SqlAlchemySecurityPriceRepository(session)
         signals = SqlAlchemySignalDailyRepository(session)
@@ -209,12 +212,23 @@ async def _collect_once_unlocked(
                                 previous_holdings,
                             )
                             written_changes = await changes.upsert_many(snapshot_changes)
+                            written_flows = 0
+                            if previous_date is not None:
+                                daily_flow, _ = decompose_flow(
+                                    previous_holdings,
+                                    fetched_holdings,
+                                    as_of_date=as_of,
+                                    prev_date=previous_date,
+                                    ticker=etf.ticker,
+                                )
+                                if daily_flow is not None:
+                                    written_flows = await flows.replace_for_etf_date(daily_flow)
                             await session.commit()
-                            processed += written_holdings + written_changes
+                            processed += written_holdings + written_changes + written_flows
                             await item_logs.log_finish(
                                 log.id or 0,
                                 status="success",
-                                row_count=written_holdings + written_changes,
+                                row_count=written_holdings + written_changes + written_flows,
                             )
                         except Exception as exc:  # noqa: BLE001 - partial collection should continue.
                             await session.rollback()

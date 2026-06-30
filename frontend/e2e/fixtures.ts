@@ -79,9 +79,23 @@ const SEEDED = {
   },
 
   holdings: [
-    { as_of_date: "2026-06-24", holding_key: "ID:NVDA", holding_ticker: "NVDA", security_id: "67066G104", holding_name: "NVIDIA CORP", weight: 8.54, shares: 15211230, market_value: 3204854048.70, change_type: "INCREASE", shares_delta: 211230, shares_delta_pct: 1.41, weight_delta: 0.24 },
-    { as_of_date: "2026-06-24", holding_key: "ID:AAPL", holding_ticker: "AAPL", security_id: "037833100", holding_name: "APPLE INC", weight: 7.53, shares: 9482129, market_value: 2825769263.29, change_type: "UNCHANGED", shares_delta: 0, shares_delta_pct: 0, weight_delta: 0 },
-    { as_of_date: "2026-06-24", holding_key: "ID:MSFT", holding_ticker: "MSFT", security_id: "594918104", holding_name: "MICROSOFT CORP", weight: 5.60, shares: 5678901, market_value: 2100000000.00, change_type: "DECREASE", shares_delta: -100000, shares_delta_pct: -1.73, weight_delta: -0.15 },
+    { as_of_date: "2026-06-24", holding_key: "ID:NVDA", holding_ticker: "NVDA", security_id: "67066G104", holding_name: "NVIDIA CORP", weight: 8.54, shares: 15211230, market_value: 3204854048.70, change_type: "INCREASE", shares_delta: 211230, shares_delta_pct: 1.41, weight_delta: 0.24, signal_n_buying: 3, signal_n_selling: 0, signal_conviction: 3, flow_adjusted: "BUY", active_direction: "BUY", active_intensity: "MEDIUM", active_confidence: "HIGH", active_residual: 120000, passive_shares: 91230, residual_nav_bp: 8.5, residual_position_pct: 0.0079 },
+    { as_of_date: "2026-06-24", holding_key: "ID:AAPL", holding_ticker: "AAPL", security_id: "037833100", holding_name: "APPLE INC", weight: 7.53, shares: 9482129, market_value: 2825769263.29, change_type: "UNCHANGED", shares_delta: 0, shares_delta_pct: 0, weight_delta: 0, signal_n_buying: 0, signal_n_selling: 0, signal_conviction: 0, flow_adjusted: "HOLD", active_direction: "NEUTRAL", active_intensity: "NONE", active_confidence: "HIGH", active_residual: 0.4, passive_shares: -0.4, residual_nav_bp: 0.0, residual_position_pct: 0.0 },
+    { as_of_date: "2026-06-24", holding_key: "ID:MSFT", holding_ticker: "MSFT", security_id: "594918104", holding_name: "MICROSOFT CORP", weight: 5.60, shares: 5678901, market_value: 2100000000.00, change_type: "DECREASE", shares_delta: -100000, shares_delta_pct: -1.73, weight_delta: -0.15, signal_n_buying: 0, signal_n_selling: 1, signal_conviction: -1, flow_adjusted: "SELL", active_direction: "SELL", active_intensity: "MEDIUM", active_confidence: "HIGH", active_residual: -85000, passive_shares: -15000, residual_nav_bp: 6.8, residual_position_pct: 0.015 },
+  ],
+
+  flow: [
+    {
+      ticker: "DYNF",
+      as_of_date: "2026-06-24",
+      prev_date: "2026-06-23",
+      net_flow: 125000000,
+      flow_rate: 0.0034,
+      active_buy: 82000000,
+      active_sell: 39000000,
+      turnover: 0.018,
+      creation_r2: 0.64,
+    },
   ],
 
   holdingDates: ["2026-06-24", "2026-06-23", "2026-06-20"],
@@ -293,7 +307,10 @@ export async function mockApi(page: Page) {
   await page.route("**/api/etfs/*/prices*", (route) => {
     route.fulfill({ status: 200, json: SEEDED.prices, headers: { "Access-Control-Allow-Origin": "*" } });
   });
-  await page.route("**/api/etfs/*/holdings?*", (route) => {
+  await page.route("**/api/etfs/*/flow*", (route) => {
+    route.fulfill({ status: 200, json: SEEDED.flow, headers: { "Access-Control-Allow-Origin": "*" } });
+  });
+  await page.route("**/api/etfs/*/holdings**", (route) => {
     route.fulfill({ status: 200, json: SEEDED.holdings, headers: { "Access-Control-Allow-Origin": "*" } });
   });
   await page.route("**/api/etfs/*/holdings/dates", (route) => {

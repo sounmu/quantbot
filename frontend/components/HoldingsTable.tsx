@@ -2,8 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { ChangeBadge, CrossSignalBadge, DeltaValue } from "@/components/TradeVisuals";
-import type { ChangeType, Holding } from "@/lib/types";
+import {
+  ActiveSignalBadge,
+  ChangeBadge,
+  CrossSignalBadge,
+  DeltaValue
+} from "@/components/TradeVisuals";
+import type { ActiveIntensity, ChangeType, Holding } from "@/lib/types";
 
 type Props = {
   holdings: Holding[];
@@ -14,7 +19,7 @@ type Props = {
 };
 
 type FilterKey = "ALL" | ChangeType;
-type SortKey = "weight" | "sharesDelta" | "weightDelta";
+type SortKey = "weight" | "sharesDelta" | "weightDelta" | "activeResidual";
 
 // EXIT 포지션은 현재 스냅샷에 존재하지 않으므로(이미 청산) 칩에서 제외한다.
 const FILTER_ORDER: ChangeType[] = ["NEW", "INCREASE", "DECREASE", "UNCHANGED"];
@@ -29,7 +34,8 @@ const FILTER_LABELS: Record<FilterKey, string> = {
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "weight", label: "비중순" },
   { key: "sharesDelta", label: "주식수 변화순" },
-  { key: "weightDelta", label: "비중 변화순" }
+  { key: "weightDelta", label: "비중 변화순" },
+  { key: "activeResidual", label: "능동 강도순" }
 ];
 const PAGE_SIZE = 15;
 
@@ -45,6 +51,15 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
       if (holding.change_type) {
         map[holding.change_type] = (map[holding.change_type] ?? 0) + 1;
       }
+    }
+    return map;
+  }, [holdings]);
+
+  const activeIntensityCounts = useMemo(() => {
+    const map: Partial<Record<ActiveIntensity, number>> = {};
+    for (const holding of holdings) {
+      const intensity = activeIntensityForCount(holding);
+      map[intensity] = (map[intensity] ?? 0) + 1;
     }
     return map;
   }, [holdings]);
@@ -71,6 +86,12 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
     sorted.sort((a, b) => {
       if (sort === "sharesDelta") return magnitude(b.shares_delta) - magnitude(a.shares_delta);
       if (sort === "weightDelta") return magnitude(b.weight_delta) - magnitude(a.weight_delta);
+      if (sort === "activeResidual") {
+        return (
+          magnitude(b.residual_nav_bp) - magnitude(a.residual_nav_bp) ||
+          magnitude(b.active_residual) - magnitude(a.active_residual)
+        );
+      }
       return b.weight - a.weight;
     });
     return sorted;
@@ -108,6 +129,16 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
               · {FILTER_LABELS[type]} {counts[type]}
             </span>
           ))}
+          {activeIntensityCounts.STRONG ||
+          activeIntensityCounts.MEDIUM ||
+          activeIntensityCounts.WEAK ||
+          activeIntensityCounts.NONE ? (
+            <span>
+              · 강한 신호 {activeIntensityCounts.STRONG ?? 0} · 중간{" "}
+              {activeIntensityCounts.MEDIUM ?? 0} · 약한 {activeIntensityCounts.WEAK ?? 0} · 중립{" "}
+              {activeIntensityCounts.NONE ?? 0}
+            </span>
+          ) : null}
         </div>
 
         <div className="relative">
@@ -138,11 +169,15 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                   aria-pressed={active}
                   onClick={() => setFilter(key)}
                   className={`inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-xs font-medium ring-1 transition ${
-                    active ? "bg-brand text-white ring-brand" : "bg-surface text-muted ring-line hover:text-ink"
+                    active
+                      ? "bg-brand text-white ring-brand"
+                      : "bg-surface text-muted ring-line hover:text-ink"
                   }`}
                 >
                   {FILTER_LABELS[key]}
-                  <span className={`tabular-nums ${active ? "text-white/75" : "text-faint"}`}>{count}</span>
+                  <span className={`tabular-nums ${active ? "text-white/75" : "text-faint"}`}>
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -165,7 +200,6 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
           <StatusCard>조건에 맞는 종목이 없습니다</StatusCard>
         ) : (
           <>
-            {/* 모바일: 카드 리스트 */}
             <div className="space-y-3 lg:hidden" role="list">
               {shown.map((holding) => {
                 const key = positionKey(holding);
@@ -198,6 +232,15 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                               buying={holding.signal_n_buying}
                               selling={holding.signal_n_selling}
                             />
+                            <ActiveSignalBadge
+                              direction={holding.active_direction}
+                              intensity={holding.active_intensity}
+                              confidence={holding.active_confidence}
+                              residualNavBp={holding.residual_nav_bp}
+                              residualPositionPct={holding.residual_position_pct}
+                              fallback={holding.flow_adjusted}
+                              compact
+                            />
                           </div>
                           <p className="mt-2 break-words text-sm leading-snug text-muted">
                             {holding.holding_name}
@@ -221,6 +264,10 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                           label="비중 변화"
                           value={<DeltaValue value={holding.weight_delta} suffix="%" />}
                         />
+                        <Metric
+                          label="능동 잔차"
+                          value={<DeltaValue value={holding.active_residual} suffix="" />}
+                        />
                         <Metric label="시장가치" value={formatMoney(holding.market_value)} />
                       </div>
                     </button>
@@ -229,7 +276,6 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
               })}
             </div>
 
-            {/* 데스크탑: 테이블 */}
             <div className="hidden overflow-hidden rounded-lg border border-line bg-surface lg:block">
               <table className="w-full text-sm">
                 <thead>
@@ -237,7 +283,7 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                     <th className="px-3 py-2.5 pl-4">종목</th>
                     <th className="px-3 py-2.5">이름</th>
                     <th className="px-3 py-2.5">변동</th>
-                    <th className="px-3 py-2.5">동반 매매</th>
+                    <th className="px-3 py-2.5">맥락</th>
                     <th className="px-3 py-2.5 text-right">비중</th>
                     <th className="px-3 py-2.5 text-right">주식수</th>
                     <th className="px-3 py-2.5 text-right">주식수 변화</th>
@@ -271,27 +317,47 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                         <td className="py-3 pl-4 font-bold tracking-tight text-ink">
                           {holding.holding_ticker ?? "미상"}
                         </td>
-                        <td className="max-w-[260px] truncate py-3 pr-3 text-muted" title={holding.holding_name}>
+                        <td
+                          className="max-w-[240px] truncate py-3 pr-3 text-muted"
+                          title={holding.holding_name}
+                        >
                           {holding.holding_name}
                         </td>
                         <td className="py-3 pr-3">
                           <ChangeBadge type={holding.change_type} compact />
                         </td>
                         <td className="py-3 pr-3">
-                          <CrossSignalBadge
-                            buying={holding.signal_n_buying}
-                            selling={holding.signal_n_selling}
-                          />
+                          <div className="flex flex-col items-start gap-1">
+                            <CrossSignalBadge
+                              buying={holding.signal_n_buying}
+                              selling={holding.signal_n_selling}
+                            />
+                            <ActiveSignalBadge
+                              direction={holding.active_direction}
+                              intensity={holding.active_intensity}
+                              confidence={holding.active_confidence}
+                              residualNavBp={holding.residual_nav_bp}
+                              residualPositionPct={holding.residual_position_pct}
+                              fallback={holding.flow_adjusted}
+                              compact
+                            />
+                          </div>
                         </td>
-                        <td className="py-3 pr-3 text-right tabular-nums text-ink">{holding.weight.toFixed(2)}%</td>
-                        <td className="py-3 pr-3 text-right tabular-nums text-body">{formatNumber(holding.shares)}</td>
+                        <td className="py-3 pr-3 text-right tabular-nums text-ink">
+                          {holding.weight.toFixed(2)}%
+                        </td>
+                        <td className="py-3 pr-3 text-right tabular-nums text-body">
+                          {formatNumber(holding.shares)}
+                        </td>
                         <td className="py-3 pr-3 text-right tabular-nums">
                           <DeltaValue value={holding.shares_delta} suffix="" />
                         </td>
                         <td className="py-3 pr-3 text-right tabular-nums">
                           <DeltaValue value={holding.weight_delta} suffix="%" />
                         </td>
-                        <td className="py-3 pr-4 text-right tabular-nums text-body">{formatMoney(holding.market_value)}</td>
+                        <td className="py-3 pr-4 text-right tabular-nums text-body">
+                          {formatMoney(holding.market_value)}
+                        </td>
                       </tr>
                     );
                   })}
@@ -326,7 +392,13 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
   );
 }
 
-function StatusCard({ children, tone = "muted" }: { children: React.ReactNode; tone?: "muted" | "error" }) {
+function StatusCard({
+  children,
+  tone = "muted"
+}: {
+  children: React.ReactNode;
+  tone?: "muted" | "error";
+}) {
   return (
     <div
       className={`rounded-lg border border-line bg-surface px-4 py-10 text-center text-sm ${
@@ -350,6 +422,16 @@ function Metric({ label, value }: { label: string; value: React.ReactNode }) {
 // 정렬용 크기: null은 -1로 떨어뜨려 항상 맨 뒤로 보낸다.
 function magnitude(value: number | null) {
   return value === null ? -1 : Math.abs(value);
+}
+
+function activeIntensityForCount(holding: Holding): ActiveIntensity {
+  if (holding.active_intensity) {
+    return holding.active_intensity;
+  }
+  if (holding.flow_adjusted === "BUY" || holding.flow_adjusted === "SELL") {
+    return "MEDIUM";
+  }
+  return "NONE";
 }
 
 function formatNumber(value: number | null) {

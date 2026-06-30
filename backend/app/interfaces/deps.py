@@ -5,11 +5,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.evaluation_service import EvaluationService
 from app.application.services.etf_service import EtfService
+from app.application.services.flow_service import FlowService
 from app.application.services.metric_service import MetricService
 from app.application.services.signal_service import SignalService
 from app.infrastructure.db.engine import get_session
 from app.infrastructure.db.repositories import (
     SqlAlchemyEtfRepository,
+    SqlAlchemyEtfFlowRepository,
     SqlAlchemyHoldingChangeRepository,
     SqlAlchemyHoldingRepository,
     SqlAlchemyMetricRepository,
@@ -36,6 +38,13 @@ def get_signal_service(session: AsyncSession = Depends(get_session)) -> SignalSe
         changes=SqlAlchemyHoldingChangeRepository(session),
         security_prices=SqlAlchemySecurityPriceRepository(session),
         signals=SqlAlchemySignalDailyRepository(session),
+    )
+
+
+def get_flow_service(session: AsyncSession = Depends(get_session)) -> FlowService:
+    return FlowService(
+        holdings=SqlAlchemyHoldingRepository(session),
+        flows=SqlAlchemyEtfFlowRepository(session),
     )
 
 

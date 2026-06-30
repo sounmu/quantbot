@@ -18,13 +18,14 @@
 - JPMorgan 일별 XLSX 어댑터(CUSIP 파라미터): JEPI, JEPQ, JGRO, JAVA, JTEK, JUSA, JPSV (ELN 행 제외)
 - Dimensional 일별 CSV 어댑터(공개 blob + fund-center 최신일자): DFAC, DFUS, DFUV, DFAS, DFAT, DFAU, DUHP, DFSV, DFLV, DCOR, DFSU, DFVX, DXUV, DUSG
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
+- ETF 일별 자금흐름 추정(`etf_flow_daily`): net flow, flow rate, turnover, creation R²와 종목별 능동 방향/강도 태그
 - yfinance profile 기반 ETF 거래소/AUM 메타 보강과 분석 유니버스 게이팅
 - 분석 유니버스 보유종목 security master와 underlying 일별 `adj_close` 가격 저장소
 - ETF 횡단 daily signal 머티리얼라이즈(`signal_daily`): n_buying/n_selling, net flow, conviction score
 - forward 초과수익 평가 엔진(`signal_outcome`): hit rate, 평균/중앙값 excess return, IC
 - APScheduler 기반 일일 자동 수집과 admin 수동 수집 API
 - ETF별 holdings 날짜, 스냅샷, 변동, 종목 이력, 전체 최근 매매 피드 API
-- Next.js App Router 프론트: PC 중심 반응형 셸(데스크탑 좌측 사이드바·와이드 콘텐츠, 모바일 하단 탭), ETF/holdings/최근 매매 데이터 테이블(모바일은 카드), 모바일 분석 화면(성과 horizon 토글·버킷별 hit rate/초과수익·컨빅션 보드·종목별 outcome 차트), 가격/비교 차트, 라이트/다크 모드 토글
+- Next.js App Router 프론트: PC 중심 반응형 셸(데스크탑 좌측 사이드바·와이드 콘텐츠, 모바일 하단 탭), ETF/holdings/최근 매매 데이터 테이블(모바일은 카드), ETF 상세 자금흐름 요약과 능동 강도 보유종목 태그, 모바일 분석 화면(성과 horizon 토글·버킷별 hit rate/초과수익·컨빅션 보드·종목별 outcome 차트), 가격/비교 차트, 라이트/다크 모드 토글
 
 ## 아키텍처 규칙
 
@@ -95,6 +96,11 @@ US/US-ISIN 후보만 `security`로 등록하고, yfinance의 `Adj Close`를 `sec
 가격 수집 후보에서 제외합니다. `BENCHMARK_TICKER`(기본 `QQQ`)도 같은 가격 스토어에 적재됩니다.
 holdings 또는 underlying 가격이 갱신되면 `signal_daily`도 재계산되어 여러 ETF가
 동시에 매수/매도한 종목의 conviction ranking을 제공합니다.
+holdings 수집 중 직전 스냅샷이 있으면 `etf_flow_daily`도 함께 갱신되어 공시 보유 기준
+순자금흐름, 자금률, 회전율, creation R²를 제공합니다.
+종목별 능동성은 `active_residual = Δshares - flow_rate * previous_shares`로 계산하고,
+1주 절대 기준만 쓰지 않고 NAV 대비 잔차 bp(`residual_nav_bp`)와 포지션 대비 잔차율
+(`residual_position_pct`)로 `NONE`/`WEAK`/`MEDIUM`/`STRONG` 강도를 나눕니다.
 이어 BUY signal(`conviction_score > 0`)은 `BENCHMARK_TICKER` 대비 1/5/20/60거래일
 forward excess return으로 평가되어 `signal_outcome`에 캐시됩니다. 진입일은
 공시일 이후 첫 가격일이라 look-ahead를 피합니다.
@@ -119,6 +125,7 @@ SIGNAL_EXCHANGES=NASDAQ,NasdaqGS,NasdaqGM,NasdaqCM,NMS,NGM,NCM,NYSE,NYQ,NYSEArca
 curl -X POST "http://localhost:8000/api/admin/collect" -H "x-admin-token: $ADMIN_TOKEN"
 curl -X POST "http://localhost:8000/api/admin/collect?with_prices=true&lookback_days=365" -H "x-admin-token: $ADMIN_TOKEN"
 curl -X POST "http://localhost:8000/api/admin/collect?with_underlying_prices=true&lookback_days=365" -H "x-admin-token: $ADMIN_TOKEN"
+curl -X POST "http://localhost:8000/api/admin/recompute-flows" -H "x-admin-token: $ADMIN_TOKEN"
 curl -X POST "http://localhost:8000/api/admin/recompute-signals" -H "x-admin-token: $ADMIN_TOKEN"
 curl -X POST "http://localhost:8000/api/admin/recompute-analysis" -H "x-admin-token: $ADMIN_TOKEN"
 curl "http://localhost:8000/api/admin/runs" -H "x-admin-token: $ADMIN_TOKEN"
@@ -153,7 +160,8 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 - `GET /health`
 - `GET /api/etfs` — `exchange`, `aum`, `in_signal_universe` 포함
 - `GET /api/etfs/{ticker}` — `exchange`, `aum`, `in_signal_universe` 포함
-- `GET /api/etfs/{ticker}/holdings?date=YYYY-MM-DD` — 각 보유종목에 교차 시그널(`signal_n_buying`/`signal_n_selling`/`signal_conviction`: 같은 날 같은 종목을 매매한 시그널 ETF 수) 포함
+- `GET /api/etfs/{ticker}/flow?range=1m|3m|6m|1y|ytd|max` — ETF 일별 자금흐름 추정 시계열
+- `GET /api/etfs/{ticker}/holdings?date=YYYY-MM-DD` — 각 보유종목에 교차 시그널(`signal_n_buying`/`signal_n_selling`/`signal_conviction`)과 능동성 태그(`flow_adjusted`/`active_direction`/`active_intensity`/`active_confidence`/`active_residual`/`passive_shares`/`residual_nav_bp`/`residual_position_pct`) 포함
 - `GET /api/etfs/{ticker}/holdings/dates`
 - `GET /api/etfs/{ticker}/changes?date=YYYY-MM-DD`
 - `GET /api/etfs/{ticker}/positions/{holding}/history`
@@ -168,6 +176,7 @@ docker compose -f docker-compose.yml -f docker-compose.postgres.yml --profile po
 - `GET /api/meta/themes`
 - `POST /api/admin/collect` with `x-admin-token` — `with_prices`, `with_underlying_prices`
 - `POST /api/admin/recompute-signals` with `x-admin-token` — `date` 선택 가능
+- `POST /api/admin/recompute-flows` with `x-admin-token` — `ticker`, `date` 선택 가능
 - `POST /api/admin/recompute-analysis` with `x-admin-token`
 - `GET /api/admin/runs` with `x-admin-token`
 - `GET /api/admin/dashboard/quality` with `x-admin-token` — stale/missing shares와

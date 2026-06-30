@@ -4,6 +4,7 @@ from app.domain.entities import (
     CollectionItemLog,
     CollectionRun,
     Etf,
+    EtfFlowDaily,
     Holding,
     HoldingChange,
     Metric,
@@ -16,6 +17,7 @@ from app.domain.entities import (
 from app.infrastructure.db.orm_models import (
     CollectionItemLogORM,
     CollectionRunORM,
+    EtfFlowDailyORM,
     EtfHoldingChangeORM,
     EtfHoldingORM,
     EtfMetricORM,
@@ -138,6 +140,20 @@ def to_holding_change(row: EtfHoldingChangeORM) -> HoldingChange:
         weight_after=row.weight_after,
         weight_delta=row.weight_delta,
         security_id=row.security_id,
+    )
+
+
+def to_etf_flow_daily(row: EtfFlowDailyORM) -> EtfFlowDaily:
+    return EtfFlowDaily(
+        ticker=row.etf.ticker,
+        as_of_date=row.as_of_date,
+        prev_date=row.prev_date,
+        net_flow=row.net_flow,
+        flow_rate=row.flow_rate,
+        active_buy=row.active_buy,
+        active_sell=row.active_sell,
+        turnover=row.turnover,
+        creation_r2=row.creation_r2,
     )
 
 

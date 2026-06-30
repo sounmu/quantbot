@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from app.domain.entities import (
     CollectionRun,
     Etf,
+    EtfFlowDaily,
     Holding,
     HoldingChange,
     Metric,
@@ -195,6 +196,26 @@ class FakeSignalOutcomeRepository:
         if security_key is not None:
             outcomes = [outcome for outcome in outcomes if outcome.security_key == security_key]
         return sorted(outcomes, key=lambda outcome: (outcome.as_of_date, outcome.horizon_days))
+
+
+class FakeEtfFlowRepository:
+    def __init__(self) -> None:
+        self._store: dict[tuple[str, date], EtfFlowDaily] = {}
+
+    async def replace_for_etf_date(self, flow: EtfFlowDaily) -> int:
+        self._store[(flow.ticker, flow.as_of_date)] = flow
+        return 1
+
+    async def series(self, ticker: str, *, range_: str = "1y") -> list[EtfFlowDaily]:
+        del range_
+        return sorted(
+            [flow for (stored_ticker, _), flow in self._store.items() if stored_ticker == ticker],
+            key=lambda flow: flow.as_of_date,
+        )
+
+    async def latest(self, ticker: str) -> EtfFlowDaily | None:
+        series = await self.series(ticker)
+        return series[-1] if series else None
 
 
 class FakeHoldingRepository:

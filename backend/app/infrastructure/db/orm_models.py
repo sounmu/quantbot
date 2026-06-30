@@ -59,6 +59,9 @@ class EtfORM(Base):
     holding_changes: Mapped[list[EtfHoldingChangeORM]] = relationship(
         back_populates="etf", cascade="all, delete-orphan"
     )
+    flows: Mapped[list[EtfFlowDailyORM]] = relationship(
+        back_populates="etf", cascade="all, delete-orphan"
+    )
     metric: Mapped[EtfMetricORM | None] = relationship(
         back_populates="etf", cascade="all, delete-orphan"
     )
@@ -256,6 +259,33 @@ class EtfHoldingChangeORM(Base):
     weight_delta: Mapped[float | None] = mapped_column(Float)
 
     etf: Mapped[EtfORM] = relationship(back_populates="holding_changes")
+
+
+class EtfFlowDailyORM(Base):
+    __tablename__ = "etf_flow_daily"
+    __table_args__ = (
+        UniqueConstraint("etf_id", "as_of_date", name="uq_etf_flow_daily_etf_date"),
+        Index("ix_etf_flow_daily_etf_date", "etf_id", "as_of_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    etf_id: Mapped[int] = mapped_column(ForeignKey("etf.id", ondelete="CASCADE"), index=True)
+    as_of_date: Mapped[date] = mapped_column(Date, index=True)
+    prev_date: Mapped[date] = mapped_column(Date)
+    net_flow: Mapped[float] = mapped_column(Float, nullable=False)
+    flow_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    active_buy: Mapped[float] = mapped_column(Float, nullable=False)
+    active_sell: Mapped[float] = mapped_column(Float, nullable=False)
+    turnover: Mapped[float] = mapped_column(Float, nullable=False)
+    creation_r2: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    etf: Mapped[EtfORM] = relationship(back_populates="flows")
 
 
 class EtfMetricORM(Base):

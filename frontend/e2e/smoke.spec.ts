@@ -21,7 +21,7 @@ test.describe("ETF list page", () => {
     const bottomTabs = page.getByRole("navigation", { name: "주요 화면" });
     await expect(bottomTabs).toBeVisible();
     await expect(bottomTabs.getByRole("link", { name: "목록" })).toBeVisible();
-    await expect(bottomTabs.getByRole("link", { name: "피드" })).toBeVisible();
+    await expect(bottomTabs.getByRole("link", { name: "매매" })).toBeVisible();
     await expect(bottomTabs.getByRole("link", { name: "분석" })).toBeVisible();
     await expect(bottomTabs.getByRole("link", { name: "비교" })).toBeVisible();
     await expect(page.locator("text=총 4개")).toBeVisible();
@@ -48,9 +48,10 @@ test.describe("ETF detail page", () => {
     });
     await expect(page.getByRole("button", { name: /AAPL 포지션 선택/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /MSFT 포지션 선택/ })).toBeVisible();
-    await expect(page.getByText("JPMORGAN CHASE & CO")).toHaveCount(0);
-    await page.getByRole("button", { name: "더보기 1개" }).click();
-    await expect(page.getByText("JPMORGAN CHASE & CO")).toBeVisible();
+    await expect(page.getByText("자금흐름 추정 · 순유입")).toBeVisible();
+    await expect(page.getByText("능동 매수").first()).toBeVisible();
+    await expect(page.getByText("자금 동반").first()).toBeVisible();
+    await expect(page.getByText("능동 매도").first()).toBeVisible();
     await expectNoHorizontalScroll(page);
   });
 });
@@ -60,7 +61,7 @@ test.describe("Changes page", () => {
     await mockApi(page);
     await page.goto("/changes");
 
-    await expect(page.locator("h1")).toContainText("최근 매매 피드");
+    await expect(page.locator("h1")).toContainText("최근 매매 내역");
     // 모바일 카드는 종목 티커를 heading으로 노출(데스크탑 테이블 셀은 hidden이라 role 쿼리에서 제외)
     await expect(page.getByRole("heading", { name: "NVDA" })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("heading", { name: "TSLA" })).toBeVisible();
@@ -81,9 +82,9 @@ test.describe("Analysis page", () => {
     await page.goto("/analysis");
 
     await expect(page.locator("h1")).toContainText("분석");
-    await expect(page.getByText("컨빅션 검증")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText("Hit rate")).toBeVisible();
-    await expect(page.getByText("컨빅션 보드")).toBeVisible();
+    await expect(page.getByText("확신도 검증")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("적중률")).toBeVisible();
+    await expect(page.getByText("확신도 보드")).toBeVisible();
     await expect(page.getByText("NVDA").first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("NVIDIA CORP").first()).toBeVisible();
     await expect(page.getByText("누가 샀나")).toBeVisible();

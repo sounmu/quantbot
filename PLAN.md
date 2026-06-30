@@ -211,14 +211,43 @@
 - 입력: 상위 보유종목, 테마 분포, 최근 NEW/INCREASE/EXIT 상위 항목.
 - 설계: 모델 Claude(비용은 Haiku 4.5, 품질 필요시 Sonnet 4.6). **스냅샷 날짜별 캐싱 필수** — `etf_summary(etf_id, as_of_date, summary, model, created_at)` 신규 테이블. 수집 파이프라인 말미/별도 배치에서 생성, API는 캐시 읽기만. 투자자문 회피 문구 유지.
 
-### H-4. (보류) 활동성 지표 + ETF 자금흐름
-두 개념은 층위가 다르다.
-- **(a) 포트폴리오 회전 = 활동성** — *매니저의 결정*. 내부 보유종목 교체 정도. `holding_change`로 즉시 계산(신규 수집 불필요). 지표: 스냅샷별 NEW/INCREASE/DECREASE/EXIT 건수, 회전율(turnover ≈ Σ|매매 추정액| / 총자산).
-- **(b) ETF 자금흐름 = creation/redemption** — *투자자의 결정*. 외부 자금 유입(좌수↑)/환매(좌수↓).
-  - **왜 중요한가**: 자금 유입 시 매니저 판단 없이도 전 종목 shares가 일제히 증가 → shares↑가 "확신 매수"가 아닌 기계적 매수일 수 있음. 자금흐름을 모르면 shares 시그널이 오염된다.
-  - **시그널 정화 규칙**: shares↑ 且 weight↑ → 능동적 매수(확신) ✅ / shares↑ 但 weight 보합·↓ → 자금유입에 딸려간 기계적 매수(노이즈). 자금흐름 맥락에서 `weight` Δ가 정화의 핵심 단서.
-  - **우리 데이터로 추정**(유료 데이터 불필요): `ETF 총자산 ≈ Σ(보유종목 market_value)`, `순자금흐름 ≈ 전 종목 공통 비례 증감 성분(공통 스케일 r)`, `능동적 매매 ≈ 공통 스케일에서 벗어난 잔차`. 전 종목 동일비율 증감→creation/redemption, 특정 종목만 튀는 잔차→능동적 종목선택. (yfinance `sharesOutstanding`/`netAssets`는 보조, active ETF 일별 좌수 신뢰도 들쭉날쭉이라 보유종목 기반 추정 권장.)
-  - **선행 결정 필요**: 추정 방식 확정(보유종목 기반 권장), 일별 추정 자금흐름 저장 컬럼/테이블 + 마이그레이션 여부.
+### H-4. 활동성 지표 + ETF 자금흐름 (1차 구현 완료)
+
+> **구현 핸드오프**: 파일별 변경·함수 시그니처·테스트·함정·완료 기준은 `FLOW_HANDOFF.md`에 자족적으로 정리됨(다른 에이전트가 단독 구현 가능). 아래는 요약.
+
+> 두 개념은 층위가 다르다. **(a) 활동성** = 매니저가 내부 종목을 교체한 정도. **(b) 자금흐름** = 투자자가 펀드에 넣고 뺀 돈(creation/redemption). (b)를 모르면 shares↑ 시그널이 자금유입에 오염된다 — 자금이 들어오면 매니저 판단 없이도 전 종목 shares가 일제히 증가하기 때문.
+
+#### 데이터 실태 (DB 조사 결과 — 방법론의 전제 검증)
+- `etf_holding`의 `shares`·`market_value` **결측 0** → 가격 역산·NAV 합산의 전제 충족.
+- `weight_i = mv_i / NAV` **완전 정합**(ARKK TSLA: weight 9.59% vs mv/Σmv 9.592%). 역산 가격 `p_i = mv_i/s_i`도 실제 시가와 일치(TSLA $375, AMD $532).
+- **NAV 기준은 `Σ market_value`(공시 보유 기준)를 채택.** `etf_metric.aum`(yfinance totalAssets)은 현금·시점차로 ±15% 벗어나므로 보조 참고만.
+- 로컬 dev DB는 스냅샷 1개뿐이면 빈 flow가 정상. production처럼 연속 스냅샷이 있는 환경에서는 즉시 재계산 가능.
+
+#### 방법론 (보유종목 기반 분해 — 유료 데이터 불필요)
+두 스냅샷 `t-1`, `t`. 공통종목 집합 `C`(양쪽 존재), 신규 `N`, 청산 `X`.
+- 가격 `p_i(t) = mv_i(t)/s_i(t)`, `NAV(t) = Σ mv_i(t)`, `Δs_i = s_i(t) − s_i(t-1)`.
+- **순자금흐름($)**: `NetFlow = Σ_{i∈C} p_i(t)·Δs_i  (+ 신규 매수액 − 청산 직전가치)`. 매니저의 종목 교체(A 사고 B 팔고)는 대체로 자금-중립이라 상쇄되고, 순매수액 ≈ net creation으로 근사.
+- **공통 성장률** `g = NetFlow / Σ_{i∈C} p_i(t)·s_i(t-1)`. (전 보유를 현재가로 평가했을 때 자금유입 비율.)
+- **종목별 분해** — 시그널 정화의 핵심:
+  - passive(자금유입 기여분) `= g · s_i(t-1)`
+  - **active residual** `ε_i = Δs_i − g·s_i(t-1)`
+  - `ε_i > 0` → 자금유입분을 차감하고도 증가 = **진짜 능동 매수(컨빅션)**. `ε_i ≈ 0` → 단지 자금 따라감. `ε_i < 0` → 자금 들어왔는데도 상대 축소.
+  - 이는 `weight` Δ와 대응하되(weight↑ ⟺ 평균보다 빠른 성장), **가격효과를 제거**한 순수 신호라는 점이 우월.
+- **능동성 지표** `creation_R²`: Δs를 g·s(t-1) 한 인자로 회귀했을 때 설명력. 높으면 자금흐름 지배(passive 펀드), 낮으면 능동적 리밸런싱 활발(ARK류) → 그 자체가 "얼마나 액티브한가" 척도.
+- **회전율** `turnover = Σ_i p_i(t)·|Δs_i| / NAV(t)` (활동성 (a)).
+- 신규 ETF 첫 스냅샷·single-snapshot ETF는 `g` 정의 불가 → 자금흐름 N/A 처리.
+
+#### 개발 단계
+- **H-4.1 (완료) 데이터 토대 검증** — shares·mv 완비, NAV=Σmv 채택 확정. 추가 수집 불필요.
+- **H-4.2 (완료) 계산 엔진** (`application/services/flow_service.py`, 순수 함수·외부의존 0): 두 스냅샷 입력 → ETF별 `{net_flow, flow_rate g, active_buy$, active_sell$, turnover, creation_r2}` + 종목별 `{passive, active_residual ε, flow_adjusted_signal}`. 합성 데이터 테스트로 자금유입-only, 능동매수, 역행 매도, 신규/청산, ZeroDivision 방어 검증.
+- **H-4.3 (완료) 저장**: 신규 테이블 `etf_flow_daily(etf_id, as_of_date, prev_date, net_flow, flow_rate, active_buy, active_sell, turnover, creation_r2)` + 마이그레이션 `0010_etf_flow_daily`. 종목별 ε는 API 응답 시 on-the-fly 계산.
+- **H-4.4 (완료) 파이프라인 훅**: `collect.py`에서 diff 직후 직전 스냅샷과 비교해 flow 계산·저장. 멱등(날짜 행 DELETE→INSERT).
+- **H-4.5 (완료) API**: `GET /api/etfs/{ticker}/flow?range=` (시계열) + `/holdings`에 `flow_adjusted`/`active_residual`/`passive_shares` 통합. Admin `POST /api/admin/recompute-flows`.
+- **H-4.6 (선택, 큰 가치) 시그널 정화 연계**: `signal_service`에서 절대 Δs 대신 `ε_i`(flow-adjusted) 기반 BUY 옵션. Phase D/E 시그널 품질 직접 개선 → 별도 의사결정 후 진행.
+- **H-4.7 (완료) 프론트**: 상세 상단 "자금흐름 추정" 요약(순자금·자금률·회전율·creation R²), 보유종목 행에 "능동 매수 / 자금 동반 / 능동 매도" 태그.
+
+#### 검증 시점
+계산 엔진(H-4.2)은 합성 단위테스트로 검증 완료. 실데이터 검증(g의 R² 분포, ARK=저R²/패시브=고R² 확인)은 production 시계열에서 `POST /api/admin/recompute-flows` 후 수행.
 
 ### H-5. (보류) Tier 3 — 신규 수집 (yfinance)
 펀더멘털 보강용, 우선순위 낮음. 배당수익률, 52주 고저, 베타. 수집 파이프라인·스키마·마이그레이션 필요.
@@ -262,6 +291,6 @@
 - [x] E. 평가 엔진 (forward 초과수익 / hit rate / IC) + look-ahead 차단 — `evaluation_service.py`, `signal_outcome` + `0009_signal_outcome`, `GET /api/analysis/performance`, `GET /api/analysis/security/{security_key}`, admin `recompute-analysis`, T+1 이후 가격만 쓰는 단위 테스트
 - [x] F. 분석 UI (성과 화면 / 컨빅션 보드 / 종목 시그널 오버레이) — `/analysis` 모바일 허브에 horizon 토글, 버킷별 hit rate·평균 초과수익·표본수·IC, 컨빅션 랭킹, 선택 종목 참여 ETF·forward outcome 차트, 백테스트/표본수/creation-redemption 경고 표시
 - [ ] G. (선택) 페이퍼 포트폴리오 백테스트
-- [~] H. ETF 상세 페이지 정보 확장 — H-1(기존 데이터 노출)·H-2(교차 시그널) 완료, H-3(AI 구성 요약)·H-4(활동성·자금흐름)·H-5(Tier3 신규 수집) 보류
+- [~] H. ETF 상세 페이지 정보 확장 — H-1(기존 데이터 노출)·H-2(교차 시그널)·H-4(활동성·자금흐름 1차) 완료, H-3(AI 구성 요약)·H-5(Tier3 신규 수집) 보류
 
 > **핵심 불변식**: 시그널은 shares Δ로 정의하고, 평가는 항상 **벤치마크 대비 초과수익**으로, **공시 인지일 이후 가격**으로만 한다.

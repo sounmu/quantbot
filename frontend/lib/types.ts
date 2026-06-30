@@ -56,9 +56,33 @@ export type Holding = {
   signal_n_buying: number | null;
   signal_n_selling: number | null;
   signal_conviction: number | null;
+  flow_adjusted: FlowAdjusted | null;
+  active_direction: ActiveDirection | null;
+  active_intensity: ActiveIntensity | null;
+  active_confidence: ActiveConfidence | null;
+  active_residual: number | null;
+  passive_shares: number | null;
+  residual_nav_bp: number | null;
+  residual_position_pct: number | null;
 };
 
 export type ChangeType = "NEW" | "EXIT" | "INCREASE" | "DECREASE" | "UNCHANGED";
+export type FlowAdjusted = "BUY" | "HOLD" | "SELL";
+export type ActiveDirection = "BUY" | "NEUTRAL" | "SELL";
+export type ActiveIntensity = "NONE" | "WEAK" | "MEDIUM" | "STRONG";
+export type ActiveConfidence = "LOW" | "MEDIUM" | "HIGH";
+
+export type EtfFlow = {
+  ticker: string;
+  as_of_date: string;
+  prev_date: string;
+  net_flow: number;
+  flow_rate: number;
+  active_buy: number;
+  active_sell: number;
+  turnover: number;
+  creation_r2: number | null;
+};
 
 export type HoldingChange = {
   ticker: string;

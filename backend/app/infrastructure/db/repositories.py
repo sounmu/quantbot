@@ -11,6 +11,7 @@ from app.domain.entities import (
     CollectionItemLog,
     CollectionRun,
     Etf,
+    EtfFlowDaily,
     Holding,
     HoldingChange,
     Metric,
@@ -33,6 +34,7 @@ from app.infrastructure.db.orm_models import (
     CollectionItemLogORM,
     CollectionLockORM,
     CollectionRunORM,
+    EtfFlowDailyORM,
     EtfHoldingChangeORM,
     EtfHoldingORM,
     EtfMetricORM,
@@ -531,6 +533,71 @@ class SqlAlchemySignalOutcomeRepository:
             )
         ).all()
         return [mappers.to_signal_outcome(row) for row in rows]
+
+
+class SqlAlchemyEtfFlowRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+
+    async def replace_for_etf_date(self, flow: EtfFlowDaily) -> int:
+        etf = await self._s.scalar(
+            select(EtfORM).where(EtfORM.ticker == normalize_ticker(flow.ticker))
+        )
+        if etf is None:
+            return 0
+
+        await self._s.execute(
+            delete(EtfFlowDailyORM).where(
+                EtfFlowDailyORM.etf_id == etf.id,
+                EtfFlowDailyORM.as_of_date == flow.as_of_date,
+            )
+        )
+        self._s.add(
+            EtfFlowDailyORM(
+                etf_id=etf.id,
+                as_of_date=flow.as_of_date,
+                prev_date=flow.prev_date,
+                net_flow=flow.net_flow,
+                flow_rate=flow.flow_rate,
+                active_buy=flow.active_buy,
+                active_sell=flow.active_sell,
+                turnover=flow.turnover,
+                creation_r2=flow.creation_r2,
+            )
+        )
+        return 1
+
+    async def series(self, ticker: str, *, range_: str = "1y") -> list[EtfFlowDaily]:
+        etf = await self._s.scalar(select(EtfORM).where(EtfORM.ticker == normalize_ticker(ticker)))
+        if etf is None:
+            return []
+
+        stmt = (
+            select(EtfFlowDailyORM)
+            .options(selectinload(EtfFlowDailyORM.etf))
+            .where(EtfFlowDailyORM.etf_id == etf.id)
+        )
+        since = _range_start(range_)
+        if since is not None:
+            stmt = stmt.where(EtfFlowDailyORM.as_of_date >= since)
+        rows = (
+            await self._s.scalars(stmt.order_by(EtfFlowDailyORM.as_of_date.asc()))
+        ).all()
+        return [mappers.to_etf_flow_daily(row) for row in rows]
+
+    async def latest(self, ticker: str) -> EtfFlowDaily | None:
+        etf = await self._s.scalar(select(EtfORM).where(EtfORM.ticker == normalize_ticker(ticker)))
+        if etf is None:
+            return None
+
+        row = await self._s.scalar(
+            select(EtfFlowDailyORM)
+            .options(selectinload(EtfFlowDailyORM.etf))
+            .where(EtfFlowDailyORM.etf_id == etf.id)
+            .order_by(EtfFlowDailyORM.as_of_date.desc())
+            .limit(1)
+        )
+        return mappers.to_etf_flow_daily(row) if row else None
 
 
 class SqlAlchemyHoldingRepository:
@@ -1032,6 +1099,25 @@ def _sum_optional(left: float | None, right: float | None) -> float | None:
     if right is None:
         return left
     return left + right
+
+
+def _range_start(range_: str) -> date | None:
+    today = date.today()
+    match range_:
+        case "1m":
+            return today - timedelta(days=31)
+        case "3m":
+            return today - timedelta(days=93)
+        case "6m":
+            return today - timedelta(days=186)
+        case "1y":
+            return today - timedelta(days=366)
+        case "ytd":
+            return date(today.year, 1, 1)
+        case "max":
+            return None
+        case _:
+            return today - timedelta(days=366)
 
 
 def _position_target(holding: str) -> str | None:

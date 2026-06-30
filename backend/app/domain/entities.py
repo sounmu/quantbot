@@ -100,6 +100,34 @@ class SignalOutcome:
 
 
 @dataclass(slots=True)
+class EtfFlowDaily:
+    ticker: str
+    as_of_date: date
+    prev_date: date
+    net_flow: float
+    flow_rate: float
+    active_buy: float
+    active_sell: float
+    turnover: float
+    creation_r2: float | None
+
+
+@dataclass(slots=True)
+class SecurityFlowComponent:
+    holding_key: str
+    holding_ticker: str | None
+    delta_shares: float
+    passive_shares: float
+    active_residual: float
+    flow_adjusted: str
+    active_direction: str
+    active_intensity: str
+    active_confidence: str
+    residual_nav_bp: float | None
+    residual_position_pct: float
+
+
+@dataclass(slots=True)
 class Holding:
     ticker: str
     as_of_date: date

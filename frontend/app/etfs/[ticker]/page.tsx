@@ -11,6 +11,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { DeltaValue } from "@/components/TradeVisuals";
 import {
   useEtfDetail,
+  useEtfFlow,
   useEtfPrices,
   useHoldingChanges,
   useHoldingDates,
@@ -18,6 +19,7 @@ import {
   usePositionHistory
 } from "@/hooks/useEtfDetail";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import type { EtfFlow } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 const RANGES = ["1m", "3m", "6m", "1y", "ytd", "max"];
@@ -31,11 +33,16 @@ export default function EtfDetailPage() {
   const [selectedPositionLabel, setSelectedPositionLabel] = useState<string | null>(null);
   const detail = useEtfDetail(ticker);
   const prices = useEtfPrices(ticker, range);
+  const flowSeries = useEtfFlow(ticker, "1y");
   const holdingDates = useHoldingDates(ticker);
   const holdings = useHoldings(ticker, snapshotDate);
   const holdingChanges = useHoldingChanges(ticker, snapshotDate);
   const positionHistory = usePositionHistory(ticker, selectedPosition);
   const watchlist = useWatchlist();
+  const flowItems = flowSeries.data ?? [];
+  const selectedFlow = snapshotDate
+    ? flowItems.find((flow) => flow.as_of_date === snapshotDate) ?? null
+    : flowItems[flowItems.length - 1] ?? null;
 
   useEffect(() => {
     setSnapshotDate(undefined);
@@ -117,6 +124,13 @@ export default function EtfDetailPage() {
           <Stat label="통화" value={detail.data?.currency ?? "-"} />
           <Stat label="공시" value={detail.data?.discloses_daily ? "일별" : "미지원"} />
         </div>
+
+        <FlowSummary
+          flow={selectedFlow}
+          snapshotDate={snapshotDate}
+          isLoading={flowSeries.isLoading}
+          isError={flowSeries.isError}
+        />
 
         {detail.data?.description ? (
           <p className="mt-3 break-words text-sm leading-relaxed text-muted">
@@ -206,7 +220,8 @@ export default function EtfDetailPage() {
       </div>
 
       <p className="mt-6 text-xs text-muted">
-        본 화면은 발행사 공시 보유 종목을 재가공한 정보이며 투자자문이 아닙니다.
+        본 화면은 발행사 공시 보유 종목을 재가공한 정보이며, 자금흐름은 공시 보유 기준
+        추정값입니다. 투자자문이 아닙니다.
       </p>
     </AppShell>
   );
@@ -217,6 +232,98 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="min-w-0 rounded-lg bg-panel px-3 py-2.5">
       <div className="text-[11px] text-faint">{label}</div>
       <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
+    </div>
+  );
+}
+
+function FlowSummary({
+  flow,
+  snapshotDate,
+  isLoading,
+  isError
+}: {
+  flow: EtfFlow | null;
+  snapshotDate: string | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <section className="mt-4 rounded-lg border border-line bg-surface px-4 py-3">
+        <FlowSummaryHeader title="자금흐름 추정" subtitle="계산값을 불러오는 중입니다." />
+      </section>
+    );
+  }
+
+  if (isError) {
+    return (
+      <section className="mt-4 rounded-lg border border-line bg-surface px-4 py-3">
+        <FlowSummaryHeader title="자금흐름 추정" subtitle="자금흐름 데이터를 불러오지 못했습니다." />
+      </section>
+    );
+  }
+
+  if (!flow) {
+    return (
+      <section className="mt-4 rounded-lg border border-line bg-surface px-4 py-3">
+        <FlowSummaryHeader
+          title="자금흐름 추정 대기"
+          subtitle={`${snapshotDate ?? "최신 기준"} · 연속 2개 이상 스냅샷부터 산출됩니다.`}
+        />
+      </section>
+    );
+  }
+
+  const netFlowTone = flow.net_flow > 0 ? "text-gain" : flow.net_flow < 0 ? "text-fall" : "text-muted";
+  const netFlowLabel = flow.net_flow > 0 ? "순유입" : flow.net_flow < 0 ? "순유출" : "중립";
+
+  return (
+    <section className="mt-4 rounded-lg border border-line bg-surface px-4 py-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <FlowSummaryHeader
+          title={`자금흐름 추정 · ${netFlowLabel}`}
+          subtitle={`${flow.prev_date} → ${flow.as_of_date} · 공시 보유 시장가치 기준`}
+        />
+        <span className="inline-flex h-6 w-fit items-center rounded-full bg-panel px-2.5 text-xs font-medium text-muted ring-1 ring-line">
+          추정값
+        </span>
+      </div>
+      <div className="mt-3 grid gap-3 border-t border-hair pt-3 sm:grid-cols-4">
+        <FlowMetric label="순자금" value={formatSignedMoney(flow.net_flow)} className={netFlowTone} />
+        <FlowMetric label="자금률" value={formatSignedRate(flow.flow_rate)} />
+        <FlowMetric label="회전율" value={formatRatioPercent(flow.turnover)} />
+        <FlowMetric label="능동성 R²" value={flow.creation_r2 === null ? "-" : flow.creation_r2.toFixed(2)} />
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted">
+        creation/redemption 정밀 데이터가 아니라 보유종목 shares·market value로 추정한 값입니다.
+        종목별 태그는 자금흐름분을 뺀 shares 잔차를 NAV bp와 포지션 비중으로 나눈 강도입니다.
+      </p>
+    </section>
+  );
+}
+
+function FlowSummaryHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div>
+      <h2 className="text-sm font-bold tracking-tight text-ink">{title}</h2>
+      <p className="mt-1 text-xs leading-relaxed text-muted">{subtitle}</p>
+    </div>
+  );
+}
+
+function FlowMetric({
+  label,
+  value,
+  className = "text-ink"
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] text-faint">{label}</div>
+      <div className={`mt-1 truncate text-sm font-semibold tabular-nums ${className}`}>{value}</div>
     </div>
   );
 }
@@ -262,6 +369,28 @@ function formatAum(value: number | null) {
     return `$${(value / 1_000_000).toFixed(0)}M`;
   }
   return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function formatSignedMoney(value: number) {
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) {
+    return `${sign}$${(abs / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  }
+  return `${sign}$${abs.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function formatSignedRate(value: number) {
+  const percent = value * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${percent.toFixed(2)}%`;
+}
+
+function formatRatioPercent(value: number) {
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 function nameKey(name: string) {

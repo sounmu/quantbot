@@ -5,10 +5,11 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.application.services.etf_service import EtfService, EtfWithMetric
+from app.application.services.flow_service import FlowService
 from app.application.services.signal_service import SignalService
-from app.domain.entities import HoldingChange
+from app.domain.entities import EtfFlowDaily, HoldingChange
 from app.domain.value_objects import holding_key
-from app.interfaces.deps import get_etf_service, get_signal_service
+from app.interfaces.deps import get_etf_service, get_flow_service, get_signal_service
 from app.interfaces.schemas.change import HoldingChangeResponse, PositionHistoryPointResponse
 from app.interfaces.schemas.etf import (
     CompareItem,
@@ -17,6 +18,7 @@ from app.interfaces.schemas.etf import (
     EtfListItem,
     EtfListResponse,
 )
+from app.interfaces.schemas.flow import EtfFlowResponse
 from app.interfaces.schemas.holding import HoldingResponse
 from app.interfaces.schemas.price import PricePointResponse
 
@@ -102,12 +104,25 @@ async def get_prices(
     ]
 
 
+@router.get("/{ticker}/flow", response_model=list[EtfFlowResponse])
+async def get_flow(
+    ticker: str,
+    range_: str = Query(default="1y", alias="range", pattern="^(1m|3m|6m|1y|ytd|max)$"),
+    service: EtfService = Depends(get_etf_service),
+    flow_service: FlowService = Depends(get_flow_service),
+) -> list[EtfFlowResponse]:
+    await _require_etf(ticker, service)
+    flows = await flow_service.series(ticker, range_=range_)
+    return [_to_flow_response(flow) for flow in flows]
+
+
 @router.get("/{ticker}/holdings", response_model=list[HoldingResponse])
 async def get_holdings(
     ticker: str,
     as_of_date: date | None = Query(default=None, alias="date"),
     service: EtfService = Depends(get_etf_service),
     signal_service: SignalService = Depends(get_signal_service),
+    flow_service: FlowService = Depends(get_flow_service),
 ) -> list[HoldingResponse]:
     await _require_etf(ticker, service)
     holdings = await service.get_holdings(ticker, as_of_date=as_of_date)
@@ -132,6 +147,12 @@ async def get_holdings(
         if holding_keys and snapshot_date is not None
         else {}
     )
+    _, flow_components = (
+        await flow_service.components(ticker, as_of_date=snapshot_date)
+        if snapshot_date is not None
+        else (None, [])
+    )
+    flow_components_by_key = {component.holding_key: component for component in flow_components}
     return [
         HoldingResponse(
             as_of_date=holding.as_of_date,
@@ -149,6 +170,14 @@ async def get_holdings(
             signal_n_buying=signal.n_buying if signal else None,
             signal_n_selling=signal.n_selling if signal else None,
             signal_conviction=signal.conviction_score if signal else None,
+            flow_adjusted=flow_component.flow_adjusted if flow_component else None,
+            active_direction=flow_component.active_direction if flow_component else None,
+            active_intensity=flow_component.active_intensity if flow_component else None,
+            active_confidence=flow_component.active_confidence if flow_component else None,
+            active_residual=flow_component.active_residual if flow_component else None,
+            passive_shares=flow_component.passive_shares if flow_component else None,
+            residual_nav_bp=flow_component.residual_nav_bp if flow_component else None,
+            residual_position_pct=flow_component.residual_position_pct if flow_component else None,
         )
         for holding in holdings
         for key in [
@@ -157,6 +186,7 @@ async def get_holdings(
         if key is not None
         for change in [changes_by_key.get(key)]
         for signal in [cross_signals.get(key)]
+        for flow_component in [flow_components_by_key.get(key)]
     ]
 
 
@@ -267,6 +297,20 @@ def _to_change_response(change: HoldingChange) -> HoldingChangeResponse:
         weight_before=change.weight_before,
         weight_after=change.weight_after,
         weight_delta=change.weight_delta,
+    )
+
+
+def _to_flow_response(flow: EtfFlowDaily) -> EtfFlowResponse:
+    return EtfFlowResponse(
+        ticker=flow.ticker,
+        as_of_date=flow.as_of_date,
+        prev_date=flow.prev_date,
+        net_flow=flow.net_flow,
+        flow_rate=flow.flow_rate,
+        active_buy=flow.active_buy,
+        active_sell=flow.active_sell,
+        turnover=flow.turnover,
+        creation_r2=flow.creation_r2,
     )
 
 

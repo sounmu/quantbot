@@ -7,6 +7,7 @@ from datetime import date
 from app.domain.entities import (
     CollectionRun,
     Etf,
+    EtfFlowDaily,
     Holding,
     HoldingChange,
     Metric,
@@ -102,6 +103,14 @@ class SignalOutcomeRepository(Protocol):
         horizon_days: int | None = None,
         security_key: str | None = None,
     ) -> list[SignalOutcome]: ...
+
+
+class EtfFlowRepository(Protocol):
+    async def replace_for_etf_date(self, flow: EtfFlowDaily) -> int: ...
+
+    async def series(self, ticker: str, *, range_: str = "1y") -> list[EtfFlowDaily]: ...
+
+    async def latest(self, ticker: str) -> EtfFlowDaily | None: ...
 
 
 class HoldingRepository(Protocol):
