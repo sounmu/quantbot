@@ -9,11 +9,14 @@
 - DDD + 헥사고날 계층 구조
 - SQLAlchemy async 기반 SQLite/PostgreSQL 교체 가능 DB 어댑터
 - ETF, 가격, holdings, holdings change, 메트릭, 수집 로그 ORM 모델과 Alembic 마이그레이션
-- ARK 공식 일별 CSV 어댑터: ARKK, ARKG, ARKW, ARKF, ARKX
-- BlackRock/iShares product-data JSON 어댑터: DYNF
+- ARK 공식 일별 CSV 어댑터: ARKK, ARKG, ARKW, ARKF, ARKX, ARKQ
+- BlackRock/iShares product-data JSON 어댑터: DYNF, BLCR, BLCV, BALI
 - State Street/SPDR 일별 XLSX 어댑터: TOTL
-- Capital Group 공식 일별 XLSX 어댑터: CGGR, CGDV
-- T. Rowe Price 상품 페이지 embedded JSON 어댑터: TCAF
+- Capital Group 공식 일별 XLSX 어댑터: CGGR, CGDV, CGUS, CGCV
+- T. Rowe Price 상품 페이지 embedded JSON 어댑터: TCAF, TGRT, TVAL, TMSL (전면공시 라인만; TCHP/TDVG/TEQI/TGRW/TSPA 등 프록시 반투명 펀드는 제외)
+- Avantis 상품 페이지 embedded JSON 어댑터: AVUV, AVUS, AVLV, AVLC, AVSC, AVMV, AVMC (+ 국제 AVDV)
+- JPMorgan 일별 XLSX 어댑터(CUSIP 파라미터): JEPI, JEPQ, JGRO, JAVA, JTEK, JUSA, JPSV (ELN 행 제외)
+- Dimensional 일별 CSV 어댑터(공개 blob + fund-center 최신일자): DFAC, DFUS, DFUV, DFAS, DFAT, DFAU, DUHP, DFSV, DFLV, DCOR, DFSU, DFVX, DXUV, DUSG
 - holdings 스냅샷 수집, 직전 스냅샷 diff 계산, 변동 저장
 - yfinance profile 기반 ETF 거래소/AUM 메타 보강과 분석 유니버스 게이팅
 - 분석 유니버스 보유종목 security master와 underlying 일별 `adj_close` 가격 저장소

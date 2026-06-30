@@ -45,12 +45,24 @@
     "discloses_daily": true
   },
   {
+    "ticker": "ARKQ",
+    "name": "ARK Autonomous Technology & Robotics ETF",
+    "issuer": "ARK",
+    "theme": "Robotics",
+    "expense_ratio": 0.75,
+    "exchange": "Cboe BZX",
+    "aum": 2900000000,
+    "discloses_daily": true
+  },
+  {
     "ticker": "JEPI",
     "name": "JPMorgan Equity Premium Income ETF",
     "issuer": "JPMorgan",
     "theme": "Income",
     "expense_ratio": 0.35,
-    "exchange": "NYSEArca"
+    "exchange": "NYSEArca",
+    "aum": 40000000000,
+    "discloses_daily": true
   },
   {
     "ticker": "JEPQ",
@@ -58,7 +70,57 @@
     "issuer": "JPMorgan",
     "theme": "Income",
     "expense_ratio": 0.35,
-    "exchange": "NasdaqGM"
+    "exchange": "NasdaqGM",
+    "aum": 39000000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JGRO",
+    "name": "JPMorgan Active Growth ETF",
+    "issuer": "JPMorgan",
+    "theme": "Growth",
+    "expense_ratio": 0.44,
+    "exchange": "NYSEArca",
+    "aum": 9700000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JAVA",
+    "name": "JPMorgan Active Value ETF",
+    "issuer": "JPMorgan",
+    "theme": "Value",
+    "expense_ratio": 0.44,
+    "exchange": "NYSEArca",
+    "aum": 5000000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JTEK",
+    "name": "JPMorgan U.S. Tech Leaders ETF",
+    "issuer": "JPMorgan",
+    "theme": "Technology",
+    "expense_ratio": 0.65,
+    "exchange": "NasdaqGM",
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JUSA",
+    "name": "JPMorgan U.S. Research Enhanced Large Cap ETF",
+    "issuer": "JPMorgan",
+    "theme": "Large Cap",
+    "expense_ratio": 0.12,
+    "exchange": "NYSEArca",
+    "discloses_daily": true
+  },
+  {
+    "ticker": "JPSV",
+    "name": "JPMorgan Active Small Cap Value ETF",
+    "issuer": "JPMorgan",
+    "theme": "Small Value",
+    "expense_ratio": 0.74,
+    "exchange": "NYSEArca",
+    "aum": 25000000,
+    "discloses_daily": true
   },
   {
     "ticker": "CGGR",
@@ -79,12 +141,163 @@
     "discloses_daily": true
   },
   {
+    "ticker": "CGUS",
+    "name": "Capital Group Core Equity ETF",
+    "issuer": "Capital Group",
+    "theme": "Core Equity",
+    "expense_ratio": 0.33,
+    "exchange": "NYSEArca",
+    "aum": 10900000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "CGCV",
+    "name": "Capital Group Conservative Equity ETF",
+    "issuer": "Capital Group",
+    "theme": "Conservative Equity",
+    "expense_ratio": 0.33,
+    "exchange": "NYSEArca",
+    "aum": 1750000000,
+    "discloses_daily": true
+  },
+  {
     "ticker": "DFAC",
     "name": "Dimensional U.S. Core Equity 2 ETF",
     "issuer": "Dimensional",
     "theme": "Core Equity",
     "expense_ratio": 0.17,
-    "exchange": "NYSEArca"
+    "exchange": "NYSEArca",
+    "aum": 46900000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFUS",
+    "name": "Dimensional U.S. Equity Market ETF",
+    "issuer": "Dimensional",
+    "theme": "Core Equity",
+    "expense_ratio": 0.09,
+    "exchange": "NYSEArca",
+    "aum": 20400000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFUV",
+    "name": "Dimensional US Marketwide Value ETF",
+    "issuer": "Dimensional",
+    "theme": "Value",
+    "expense_ratio": 0.21,
+    "exchange": "NYSEArca",
+    "aum": 15300000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFAS",
+    "name": "Dimensional U.S. Small Cap ETF",
+    "issuer": "Dimensional",
+    "theme": "Small Cap",
+    "expense_ratio": 0.27,
+    "exchange": "NYSEArca",
+    "aum": 14900000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFAT",
+    "name": "Dimensional U.S. Targeted Value ETF",
+    "issuer": "Dimensional",
+    "theme": "Small Value",
+    "expense_ratio": 0.28,
+    "exchange": "NYSEArca",
+    "aum": 14300000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFAU",
+    "name": "Dimensional US Core Equity Market ETF",
+    "issuer": "Dimensional",
+    "theme": "Core Equity",
+    "expense_ratio": 0.12,
+    "exchange": "NYSEArca",
+    "aum": 12200000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DUHP",
+    "name": "Dimensional US High Profitability ETF",
+    "issuer": "Dimensional",
+    "theme": "Quality",
+    "expense_ratio": 0.21,
+    "exchange": "NYSEArca",
+    "aum": 12100000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFSV",
+    "name": "Dimensional US Small Cap Value ETF",
+    "issuer": "Dimensional",
+    "theme": "Small Value",
+    "expense_ratio": 0.29,
+    "exchange": "NYSEArca",
+    "aum": 7900000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFLV",
+    "name": "Dimensional US Large Cap Value ETF",
+    "issuer": "Dimensional",
+    "theme": "Large Value",
+    "expense_ratio": 0.22,
+    "exchange": "NYSEArca",
+    "aum": 6300000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DCOR",
+    "name": "Dimensional US Core Equity 1 ETF",
+    "issuer": "Dimensional",
+    "theme": "Core Equity",
+    "expense_ratio": 0.12,
+    "exchange": "NYSEArca",
+    "aum": 3200000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFSU",
+    "name": "Dimensional US Sustainability Core 1 ETF",
+    "issuer": "Dimensional",
+    "theme": "Sustainability",
+    "expense_ratio": 0.18,
+    "exchange": "NYSEArca",
+    "aum": 2200000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DFVX",
+    "name": "Dimensional US Large Cap Vector ETF",
+    "issuer": "Dimensional",
+    "theme": "Large Cap",
+    "expense_ratio": 0.21,
+    "exchange": "NYSEArca",
+    "aum": 514000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DXUV",
+    "name": "Dimensional US Vector Equity ETF",
+    "issuer": "Dimensional",
+    "theme": "Core Equity",
+    "expense_ratio": 0.23,
+    "exchange": "NYSEArca",
+    "aum": 423000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "DUSG",
+    "name": "Dimensional US Small Cap Growth ETF",
+    "issuer": "Dimensional",
+    "theme": "Small Growth",
+    "expense_ratio": 0.33,
+    "exchange": "NYSEArca",
+    "discloses_daily": true
   },
   {
     "ticker": "AVUV",
@@ -93,6 +306,66 @@
     "theme": "Small Value",
     "expense_ratio": 0.25,
     "exchange": "NYSEArca",
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVUS",
+    "name": "Avantis U.S. Equity ETF",
+    "issuer": "Avantis",
+    "theme": "Core Equity",
+    "expense_ratio": 0.15,
+    "exchange": "NYSEArca",
+    "aum": 13500000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVLV",
+    "name": "Avantis U.S. Large Cap Value ETF",
+    "issuer": "Avantis",
+    "theme": "Large Value",
+    "expense_ratio": 0.15,
+    "exchange": "NYSEArca",
+    "aum": 13200000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVLC",
+    "name": "Avantis U.S. Large Cap Equity ETF",
+    "issuer": "Avantis",
+    "theme": "Large Cap",
+    "expense_ratio": 0.15,
+    "exchange": "NYSEArca",
+    "aum": 1260000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVSC",
+    "name": "Avantis U.S. Small Cap Equity ETF",
+    "issuer": "Avantis",
+    "theme": "Small Cap",
+    "expense_ratio": 0.25,
+    "exchange": "NYSEArca",
+    "aum": 2910000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVMV",
+    "name": "Avantis U.S. Mid Cap Value ETF",
+    "issuer": "Avantis",
+    "theme": "Mid Value",
+    "expense_ratio": 0.20,
+    "exchange": "NYSEArca",
+    "aum": 657000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "AVMC",
+    "name": "Avantis U.S. Mid Cap Equity ETF",
+    "issuer": "Avantis",
+    "theme": "Mid Cap",
+    "expense_ratio": 0.18,
+    "exchange": "NYSEArca",
+    "aum": 422000000,
     "discloses_daily": true
   },
   {
@@ -123,6 +396,36 @@
     "discloses_daily": true
   },
   {
+    "ticker": "BLCR",
+    "name": "iShares Large Cap Core Active ETF",
+    "issuer": "BlackRock",
+    "theme": "Large Cap",
+    "expense_ratio": 0.36,
+    "exchange": "NasdaqGM",
+    "aum": 6100000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "BLCV",
+    "name": "iShares Large Cap Value Active ETF",
+    "issuer": "BlackRock",
+    "theme": "Large Value",
+    "expense_ratio": 0.46,
+    "exchange": "NYSEArca",
+    "aum": 317000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "BALI",
+    "name": "iShares U.S. Large Cap Premium Income Active ETF",
+    "issuer": "BlackRock",
+    "theme": "Income",
+    "expense_ratio": 0.35,
+    "exchange": "Cboe BZX",
+    "aum": 1220000000,
+    "discloses_daily": true
+  },
+  {
     "ticker": "FBCG",
     "name": "Fidelity Blue Chip Growth ETF",
     "issuer": "Fidelity",
@@ -137,6 +440,36 @@
     "theme": "Capital Appreciation",
     "expense_ratio": 0.31,
     "exchange": "NYSEArca",
+    "discloses_daily": true
+  },
+  {
+    "ticker": "TGRT",
+    "name": "T. Rowe Price Growth ETF",
+    "issuer": "T. Rowe Price",
+    "theme": "Growth",
+    "expense_ratio": 0.38,
+    "exchange": "NYSEArca",
+    "aum": 1170000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "TVAL",
+    "name": "T. Rowe Price Value ETF",
+    "issuer": "T. Rowe Price",
+    "theme": "Value",
+    "expense_ratio": 0.33,
+    "exchange": "NYSEArca",
+    "aum": 730000000,
+    "discloses_daily": true
+  },
+  {
+    "ticker": "TMSL",
+    "name": "T. Rowe Price Small-Mid Cap ETF",
+    "issuer": "T. Rowe Price",
+    "theme": "Small Mid Cap",
+    "expense_ratio": 0.49,
+    "exchange": "NYSEArca",
+    "aum": 1950000000,
     "discloses_daily": true
   },
   {

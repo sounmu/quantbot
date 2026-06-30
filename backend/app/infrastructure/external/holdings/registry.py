@@ -5,7 +5,9 @@ from app.domain.entities import Etf
 from app.infrastructure.external.holdings.ark_provider import ArkHoldingsProvider
 from app.infrastructure.external.holdings.avantis_provider import AvantisHoldingsProvider
 from app.infrastructure.external.holdings.capital_group_provider import CapitalGroupHoldingsProvider
+from app.infrastructure.external.holdings.dimensional_provider import DimensionalHoldingsProvider
 from app.infrastructure.external.holdings.ishares_provider import ISharesHoldingsProvider
+from app.infrastructure.external.holdings.jpmorgan_provider import JPMorganHoldingsProvider
 from app.infrastructure.external.holdings.spdr_provider import SpdrHoldingsProvider
 from app.infrastructure.external.holdings.trowe_price_provider import TRowePriceHoldingsProvider
 from app.infrastructure.external.holdings.virtus_provider import VirtusHoldingsProvider
@@ -21,6 +23,8 @@ class HoldingsProviderRegistry:
             TRowePriceHoldingsProvider(),
             AvantisHoldingsProvider(),
             VirtusHoldingsProvider(),
+            JPMorganHoldingsProvider(),
+            DimensionalHoldingsProvider(),
         ]
 
     def provider_for(self, etf: Etf) -> HoldingsProvider | None:

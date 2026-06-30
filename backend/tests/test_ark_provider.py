@@ -34,3 +34,35 @@ def test_ark_provider_parses_fixture_file() -> None:
     assert holdings[0].weight == 9.68
     assert holdings[1].holding_ticker == "ROKU"
     assert holdings[2].holding_ticker == "ZM"
+
+
+def test_ark_provider_uses_current_renamed_fund_slugs() -> None:
+    assert (
+        ArkHoldingsProvider._SLUGS["ARKF"]
+        == "ARK_BLOCKCHAIN_&_FINTECH_INNOVATION_ETF_ARKF_HOLDINGS.csv"
+    )
+    assert ArkHoldingsProvider._SLUGS["ARKX"] == "ARK_SPACE_&_DEFENSE_INNOVATION_ETF_ARKX_HOLDINGS.csv"
+
+
+def test_ark_provider_normalizes_us_bloomberg_suffixes_only() -> None:
+    csv_text = """date,fund,company,ticker,cusip,shares,market value ($),weight (%)
+06/29/2026,ARKX,ROCKET LAB,RKLB UQ,773121108,"591,295","$10,000.00",5.71%
+06/29/2026,ARKX,DRAFTKINGS INC-CL A,DKNG UW,26142V105,"12,345","$9,000.00",2.36%
+06/29/2026,ARKX,NU HOLDINGS LTD/CAYMAN ISL-A,NU UN,G6683N103,"12,345","$9,000.00",2.01%
+06/29/2026,ARKX,GARMIN LTD,GRMN UN,B3Z5T14,"12,345","$9,000.00",1.49%
+06/29/2026,ARKX,DASSAULT SYSTEMES SE,DSY FP,B1YXBJ7,"12,345","$9,000.00",1.02%
+06/29/2026,ARKX,JD LOGISTICS INC,2618,BM8Q5M0,"12,345","$9,000.00",0.92%
+06/29/2026,ARKX,3IQ ETHER STAKING ETF,ETHQ/U,CA88557R1091,"12,345","$9,000.00",0.43%
+"""
+
+    holdings = ArkHoldingsProvider().parse_fixture("ARKX", csv_text)
+
+    assert [holding.holding_ticker for holding in holdings] == [
+        "RKLB",
+        "DKNG",
+        "NU",
+        "GRMN",
+        "DSY FP",
+        "2618",
+        "ETHQ/U",
+    ]

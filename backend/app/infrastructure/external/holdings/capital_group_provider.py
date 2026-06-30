@@ -13,6 +13,8 @@ class CapitalGroupHoldingsProvider(CsvHoldingsProviderBase):
     _URLS = {
         "CGGR": f"{_BASE_URL}CGGR/download/daily-holdings?audience=advisor",
         "CGDV": f"{_BASE_URL}CGDV/download/daily-holdings?audience=advisor",
+        "CGUS": f"{_BASE_URL}CGUS/download/daily-holdings?audience=advisor",
+        "CGCV": f"{_BASE_URL}CGCV/download/daily-holdings?audience=advisor",
     }
 
     def supports(self, issuer: str) -> bool:

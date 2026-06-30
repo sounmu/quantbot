@@ -11,14 +11,16 @@ from app.infrastructure.external.holdings.base_csv import CsvHoldingsProviderBas
 
 
 class AvantisHoldingsProvider(CsvHoldingsProviderBase):
+    _BASE_URL = "https://www.avantisinvestors.com/avantis-investments/"
     _URLS = {
-        "AVUV": (
-            "https://www.avantisinvestors.com/avantis-investments/avantis-us-small-cap-value-etf/"
-        ),
-        "AVDV": (
-            "https://www.avantisinvestors.com/avantis-investments/"
-            "avantis-international-small-cap-value-etf/"
-        ),
+        "AVUV": f"{_BASE_URL}avantis-us-small-cap-value-etf/",
+        "AVDV": f"{_BASE_URL}avantis-international-small-cap-value-etf/",
+        "AVUS": f"{_BASE_URL}avantis-us-equity-etf/",
+        "AVLV": f"{_BASE_URL}avantis-us-large-cap-value-etf/",
+        "AVLC": f"{_BASE_URL}avantis-us-large-cap-equity-etf/",
+        "AVSC": f"{_BASE_URL}avantis-us-small-cap-equity-etf/",
+        "AVMV": f"{_BASE_URL}avantis-us-mid-cap-value-etf/",
+        "AVMC": f"{_BASE_URL}avantis-us-mid-cap-equity-etf/",
     }
 
     def supports(self, issuer: str) -> bool:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from urllib.parse import quote
 
 from app.domain.entities import Etf, Holding
@@ -13,9 +14,12 @@ class ArkHoldingsProvider(CsvHoldingsProviderBase):
         "ARKK": "ARK_INNOVATION_ETF_ARKK_HOLDINGS.csv",
         "ARKG": "ARK_GENOMIC_REVOLUTION_ETF_ARKG_HOLDINGS.csv",
         "ARKW": "ARK_NEXT_GENERATION_INTERNET_ETF_ARKW_HOLDINGS.csv",
-        "ARKF": "ARK_FINTECH_INNOVATION_ETF_ARKF_HOLDINGS.csv",
-        "ARKX": "ARK_SPACE_EXPLORATION_&_INNOVATION_ETF_ARKX_HOLDINGS.csv",
+        "ARKF": "ARK_BLOCKCHAIN_&_FINTECH_INNOVATION_ETF_ARKF_HOLDINGS.csv",
+        "ARKX": "ARK_SPACE_&_DEFENSE_INNOVATION_ETF_ARKX_HOLDINGS.csv",
+        "ARKQ": "ARK_AUTONOMOUS_TECH._&_ROBOTICS_ETF_ARKQ_HOLDINGS.csv",
     }
+    _US_BLOOMBER_SUFFIXES = {"UN", "UQ", "US", "UW"}
+    _US_SYMBOL_PATTERN = re.compile(r"^[A-Z]{1,5}(?:[/.-][A-Z])?$")
 
     def supports(self, issuer: str) -> bool:
         return issuer.strip().upper() == "ARK"
@@ -41,7 +45,7 @@ class ArkHoldingsProvider(CsvHoldingsProviderBase):
                 continue
 
             holding_name = (row.get("company") or "").strip()
-            holding_ticker = self.clean_holding_ticker(row.get("ticker"))
+            holding_ticker = self._clean_ark_ticker(row.get("ticker"))
             if holding_key(holding_ticker, holding_name) is None:
                 continue
 
@@ -61,3 +65,17 @@ class ArkHoldingsProvider(CsvHoldingsProviderBase):
                 )
             )
         return holdings
+
+    def _clean_ark_ticker(self, value: str | None) -> str | None:
+        ticker = self.clean_holding_ticker(value)
+        if ticker is None:
+            return None
+
+        parts = ticker.split()
+        if (
+            len(parts) == 2
+            and parts[1] in self._US_BLOOMBER_SUFFIXES
+            and self._US_SYMBOL_PATTERN.fullmatch(parts[0])
+        ):
+            return parts[0]
+        return ticker

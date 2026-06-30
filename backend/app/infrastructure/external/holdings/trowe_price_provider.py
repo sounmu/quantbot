@@ -11,11 +11,14 @@ from app.infrastructure.external.holdings.base_csv import CsvHoldingsProviderBas
 
 
 class TRowePriceHoldingsProvider(CsvHoldingsProviderBase):
+    _BASE_URL = (
+        "https://www.troweprice.com/financial-intermediary/us/en/investments/etfs/"
+    )
     _URLS = {
-        "TCAF": (
-            "https://www.troweprice.com/financial-intermediary/us/en/investments/"
-            "etfs/capital-appreciation-equity-etf.html"
-        )
+        "TCAF": f"{_BASE_URL}capital-appreciation-equity-etf.html",
+        "TGRT": f"{_BASE_URL}growth-etf.html",
+        "TVAL": f"{_BASE_URL}value-etf.html",
+        "TMSL": f"{_BASE_URL}small-mid-cap-etf.html",
     }
 
     def supports(self, issuer: str) -> bool:

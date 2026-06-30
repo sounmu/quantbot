@@ -9,23 +9,31 @@ from app.infrastructure.external.holdings.base_csv import CsvHoldingsProviderBas
 
 
 class ISharesHoldingsProvider(CsvHoldingsProviderBase):
-    _URLS = {
-        "DYNF": (
-            "https://www.blackrock.com/varnish-api/blk-one01-product-data/product-data/api/v2/"
-            "get-product-data?appType=PRODUCT_PAGE&appSubType=ISHARES&targetSite=us-ishares"
-            "&locale=en_US&portfolioId=307283&component=holdings&userType=individual"
-            "&excludeContent=true&includeConfig=true"
-        )
+    # BlackRock's product-data API is keyed by a numeric portfolioId per fund.
+    _PORTFOLIO_IDS = {
+        "DYNF": "307283",
+        "BLCR": "333889",
+        "BLCV": "331795",
+        "BALI": "333207",
     }
 
     def supports(self, issuer: str) -> bool:
         return issuer.strip().upper() == "BLACKROCK"
 
+    def _url_for(self, portfolio_id: str) -> str:
+        return (
+            "https://www.blackrock.com/varnish-api/blk-one01-product-data/product-data/api/v2/"
+            "get-product-data?appType=PRODUCT_PAGE&appSubType=ISHARES&targetSite=us-ishares"
+            f"&locale=en_US&portfolioId={portfolio_id}&component=holdings&userType=individual"
+            "&excludeContent=true&includeConfig=true"
+        )
+
     async def fetch_holdings(self, etf: Etf) -> list[Holding]:
         ticker = normalize_ticker(etf.ticker)
-        url = self._URLS.get(ticker)
-        if url is None:
+        portfolio_id = self._PORTFOLIO_IDS.get(ticker)
+        if portfolio_id is None:
             return []
+        url = self._url_for(portfolio_id)
 
         data = await self.download_json(url)
         if not isinstance(data, dict):
