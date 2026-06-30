@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, Info, Star } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ChangeFeed } from "@/components/ChangeFeed";
 import { HoldingsTable } from "@/components/HoldingsTable";
@@ -289,10 +289,28 @@ function FlowSummary({
         </span>
       </div>
       <div className="mt-3 grid gap-3 border-t border-hair pt-3 sm:grid-cols-4">
-        <FlowMetric label="순자금" value={formatSignedMoney(flow.net_flow)} className={netFlowTone} />
-        <FlowMetric label="자금률" value={formatSignedRate(flow.flow_rate)} />
-        <FlowMetric label="회전율" value={formatRatioPercent(flow.turnover)} />
-        <FlowMetric label="능동성 R²" value={flow.creation_r2 === null ? "-" : flow.creation_r2.toFixed(2)} />
+        <FlowMetric
+          label="순자금"
+          value={formatSignedMoney(flow.net_flow)}
+          className={netFlowTone}
+          hint="직전 스냅샷 대비 ETF로 추정 유입/유출된 순자금입니다. 양수면 순유입(creation), 음수면 순유출(redemption)이며, 보유종목 시장가치 변화에서 추정한 값입니다."
+        />
+        <FlowMetric
+          label="자금률"
+          value={formatSignedRate(flow.flow_rate)}
+          hint="전 종목에 공통으로 적용된 비례 증감률입니다. 예를 들어 +2%면 자금 유입으로 모든 종목 주식수가 약 2% 일괄 증가했다는 추정을 뜻합니다."
+        />
+        <FlowMetric
+          label="회전율"
+          value={formatRatioPercent(flow.turnover)}
+          hint="스냅샷 사이 매니저의 능동적 매매 규모를 NAV로 나눈 비율입니다. 자금흐름분을 제외한 순수 종목 교체 강도를 나타냅니다."
+        />
+        <FlowMetric
+          label="능동성 R²"
+          value={flow.creation_r2 === null ? "-" : flow.creation_r2.toFixed(2)}
+          align="right"
+          hint="주식수 변화가 '전 종목 공통 비례(자금흐름)' 모델로 얼마나 설명되는지(0~1)입니다. 1에 가까울수록 순수 자금유입형, 낮을수록 종목별 능동적 선택 비중이 큽니다."
+        />
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
         creation/redemption 정밀 데이터가 아니라 보유종목 shares·market value로 추정한 값입니다.
@@ -314,15 +332,34 @@ function FlowSummaryHeader({ title, subtitle }: { title: string; subtitle: strin
 function FlowMetric({
   label,
   value,
-  className = "text-ink"
+  className = "text-ink",
+  hint,
+  align = "left"
 }: {
   label: string;
   value: string;
   className?: string;
+  hint?: string;
+  align?: "left" | "right";
 }) {
   return (
-    <div className="min-w-0">
-      <div className="text-[11px] text-faint">{label}</div>
+    <div className="group relative min-w-0">
+      <div className="flex items-center gap-1 text-[11px] text-faint">
+        <span>{label}</span>
+        {hint ? (
+          <Info className="h-3 w-3 shrink-0 cursor-help text-faint/70" aria-hidden="true" />
+        ) : null}
+      </div>
+      {hint ? (
+        <div
+          role="tooltip"
+          className={`pointer-events-none absolute top-full z-20 mt-1 hidden w-60 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-surface p-2.5 text-[11px] font-normal leading-relaxed text-muted shadow-lg group-hover:block ${
+            align === "right" ? "right-0" : "left-0"
+          }`}
+        >
+          {hint}
+        </div>
+      ) : null}
       <div className={`mt-1 truncate text-sm font-semibold tabular-nums ${className}`}>{value}</div>
     </div>
   );

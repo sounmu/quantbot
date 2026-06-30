@@ -281,7 +281,6 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                 <thead>
                   <tr className="border-b border-line text-left text-xs font-semibold text-faint">
                     <th className="px-3 py-2.5 pl-4">종목</th>
-                    <th className="px-3 py-2.5">이름</th>
                     <th className="px-3 py-2.5">변동</th>
                     <th className="px-3 py-2.5">맥락</th>
                     <th className="px-3 py-2.5 text-right">비중</th>
@@ -314,14 +313,16 @@ export function HoldingsTable({ holdings, isLoading, errorMessage, selectedKey, 
                           isSelected ? "bg-brand-soft" : "hover:bg-panel"
                         }`}
                       >
-                        <td className="py-3 pl-4 font-bold tracking-tight text-ink">
-                          {holding.holding_ticker ?? "미상"}
-                        </td>
-                        <td
-                          className="max-w-[240px] truncate py-3 pr-3 text-muted"
-                          title={holding.holding_name}
-                        >
-                          {holding.holding_name}
+                        <td className="max-w-[220px] py-3 pl-4 pr-3">
+                          <div className="font-bold leading-tight tracking-tight text-ink">
+                            {holding.holding_ticker ?? "미상"}
+                          </div>
+                          <div
+                            className="mt-0.5 truncate text-xs leading-tight text-muted"
+                            title={holding.holding_name}
+                          >
+                            {holding.holding_name}
+                          </div>
                         </td>
                         <td className="py-3 pr-3">
                           <ChangeBadge type={holding.change_type} compact />
